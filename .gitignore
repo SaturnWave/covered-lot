@@ -1,0 +1,45 @@
+# Unity: generated folders (the project may sit in a subfolder, so nothing is anchored)
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+[Mm]emoryCaptures/
+[Rr]ecordings/
+
+# IDE and generated project files
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+.vs/
+.idea/
+
+# Build outputs and packages
+*.apk
+*.aab
+*.unitypackage
+sysinfo.txt
+crashlytics-build.properties
+
+# Signing material never goes into this repository
+*.keystore
+*.jks
+*.p12
+*.mobileprovision
+*.pem
+
+# OS files
+.DS_Store
+Thumbs.db
