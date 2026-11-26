@@ -1,18 +1,33 @@
-# Unity: generated folders (the project may sit in a subfolder, so nothing is anchored)
-[Ll]ibrary/
-[Tt]emp/
-[Oo]bj/
-[Bb]uild/
-[Bb]uilds/
-[Ll]ogs/
-[Uu]ser[Ss]ettings/
-[Mm]emoryCaptures/
-[Rr]ecordings/
+# Unity: generated folders. The Unity project sits at the repository root, so these are
+# anchored there; a source folder that happens to be called Build or Logs stays tracked.
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emoryCaptures/
+/[Rr]ecordings/
+/.utmp/
+/Assets/_Recovery/
+/Assets/InitTestScene*.unity
+/Assets/InitTestScene*.unity.meta
+/Assets/SceneDependencyCache*
+/Assets/Plugins/Android/**/local.properties
+/UIElementsSchema/
+/*_BackUpThisFolder_ButDontShipItWithYourGame/
+/*_BurstDebugInformation_DoNotShip/
+mono_crash.*
+*.pdb.meta
+*.mdb.meta
+*.pidb.meta
 
-# IDE and generated project files
+# IDE and generated project files (Unity writes *.csproj and *.sln at the root)
 *.csproj
 *.unityproj
 *.sln
+*.slnx
 *.suo
 *.user
 *.userprefs
@@ -25,21 +40,43 @@
 *.VC.db
 .vs/
 .idea/
+.vscode/
+.vsconfig
+.gradle/
+# ...except the hand-written .NET projects that test the Unity-free code
+!/dotnet/**/*.csproj
+
+# .NET and local check output
+/dotnet/**/[Bb]in/
+/dotnet/**/[Oo]bj/
+TestResults/
+/artifacts/local/
+*.binlog
+*.log
+*.tmp
+test-results*.xml
 
 # Build outputs and packages
 *.apk
 *.aab
+*.obb
 *.unitypackage
 sysinfo.txt
 crashlytics-build.properties
 
-# Signing material never goes into this repository
+# Signing material and secrets never go into this public repository
 *.keystore
 *.jks
 *.p12
+*.p8
+*.pfx
 *.mobileprovision
 *.pem
+.env
 
-# OS files
+# Local tools and OS files
+graphify-out/
+.claude/settings.local.json
+.claude/worktrees/
 .DS_Store
 Thumbs.db

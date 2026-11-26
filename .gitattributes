@@ -1,0 +1,10 @@
+# Line endings are part of determinism: the level texts must stay byte-identical to the
+# engine's canonical output (LF only), and this machine's git sets core.autocrlf=true.
+* text=auto eol=lf
+*.sh text eol=lf
+*.dll binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ttf binary
+*.otf binary
