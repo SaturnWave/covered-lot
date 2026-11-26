@@ -115,7 +115,7 @@ namespace CoveredLot.EditorTools
         /// <summary>An existing asset is updated in place, so the scene's reference to it stays valid.</summary>
         private static void WritePanelSettings(ThemeStyleSheet theme)
         {
-            PanelSettings existing = AssetDatabase.LoadAssetAtPath<PanelSettings>(PanelPath);
+            PanelSettings? existing = AssetDatabase.LoadAssetAtPath<PanelSettings>(PanelPath);
             if (existing == null)
             {
                 PanelSettings created = ScriptableObject.CreateInstance<PanelSettings>();
@@ -245,7 +245,7 @@ namespace CoveredLot.EditorTools
         /// <summary>The asset at the path; a missing one means the step before failed, so the run stops there.</summary>
         private static T LoadAsset<T>(string path) where T : UnityEngine.Object
         {
-            T asset = AssetDatabase.LoadAssetAtPath<T>(path);
+            T? asset = AssetDatabase.LoadAssetAtPath<T>(path);
             if (asset == null)
             {
                 throw new InvalidOperationException("ProjectSetup could not load " + path + " as " + typeof(T).Name + ".");

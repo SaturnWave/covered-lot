@@ -15,12 +15,12 @@ namespace CoveredLot.Client
         private const string TitleClass = "covered-lot-title";
 
         /// <summary>
-        /// UIDocument runs at execution order -100 and builds its root element when it is enabled, if it has panel
-        /// settings, so the root exists by the time this Awake runs.
+        /// UIDocument runs at execution order -100 and creates its root element when it is enabled, so the root exists by
+        /// the time this Awake runs. Without panel settings that root is never attached to a panel, so nothing shows.
         /// </summary>
         private void Awake()
         {
-            UIDocument document = GetComponent<UIDocument>();
+            UIDocument? document = GetComponent<UIDocument>();
             if (document == null)
             {
                 Debug.LogError(nameof(GameRoot) + " needs a " + nameof(UIDocument) + " on the same GameObject, so it disables itself.", this);

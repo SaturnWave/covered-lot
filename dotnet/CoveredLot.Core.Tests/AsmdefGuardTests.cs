@@ -12,17 +12,22 @@ using Xunit;
 namespace CoveredLot.Core.Tests
 {
     /// <summary>
-    /// The Unity side of the compile rules (design sections 3, 8.1 and 10a). Core's assembly definition keeps it
-    /// Unity-free and lets it see only the two engine DLLs, and the .NET build of Core references no more; no assembly
-    /// allows unsafe code; and every CoveredLot assembly carries its own csc.rsp, because a csc.rsp at the Assets root
-    /// would apply to every package as well. Unity and the .NET build compile the same files into Core: the .NET build
-    /// takes every .cs under Assets/CoveredLot/Core, so no other asmdef or asmref may move files in or out of Core in
-    /// Unity, and no source may sit where Unity does not import it.
+    /// The Unity side of the compile rules (design sections 3, 8.1 and 10a). The three CoveredLot assemblies are Core,
+    /// the Client and the Editor, and each asmdef is pinned property by property: Core's keeps it Unity-free and lets it
+    /// see only the two engine DLLs, and the .NET build of Core references no more; the Client's and the Editor's
+    /// override the precompiled references with none, so neither compiles against the engine DLLs. No assembly allows
+    /// unsafe code, and every CoveredLot assembly carries its own csc.rsp, because a csc.rsp at the Assets root would
+    /// apply to every package as well. Unity and the .NET build compile the same files into Core: the .NET build takes
+    /// every .cs under Assets/CoveredLot/Core, so no other asmdef or asmref may move files in or out of Core in Unity,
+    /// and no source may sit where Unity does not import it.
     /// </summary>
     public sealed class AsmdefGuardTests
     {
-        private const string CoreFolder = "Assets/CoveredLot/Core";
+        private const string CoveredLotFolder = "Assets/CoveredLot";
+        private const string CoreFolder = CoveredLotFolder + "/Core";
         private const string CoreAsmdef = CoreFolder + "/CoveredLot.Core.asmdef";
+        private const string ClientAsmdef = CoveredLotFolder + "/Client/CoveredLot.Client.asmdef";
+        private const string EditorAsmdef = CoveredLotFolder + "/Editor/CoveredLot.Editor.asmdef";
         private const string CoreAssembly = "CoveredLot.Core";
 
         /// <summary>The assembly every netstandard2.1 library references; Unity gives it to every assembly as well.</summary>
@@ -48,6 +53,49 @@ namespace CoveredLot.Core.Tests
             ["noEngineReferences"] = "true",
         };
 
+        /// <summary>
+        /// The Client's asmdef: it references Core and overrides the precompiled references with none. Without the
+        /// override, Unity hands the game code the package DLLs whose import settings leave Auto Reference on, NUnit and
+        /// Mono.Cecil among them (seen in Unity's response file for the Client when piece 9 was reviewed). A piece that
+        /// gives the Client the engine DLLs names them here and in the asmdef in one commit.
+        /// </summary>
+        private static readonly IReadOnlyDictionary<string, string> ExpectedClientAsmdef = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["name"] = "\"CoveredLot.Client\"",
+            ["rootNamespace"] = "\"CoveredLot.Client\"",
+            ["references"] = "[\"CoveredLot.Core\"]",
+            ["includePlatforms"] = "[]",
+            ["excludePlatforms"] = "[]",
+            ["allowUnsafeCode"] = "false",
+            ["overrideReferences"] = "true",
+            ["precompiledReferences"] = "[]",
+            ["autoReferenced"] = "false",
+            ["defineConstraints"] = "[]",
+            ["versionDefines"] = "[]",
+            ["noEngineReferences"] = "false",
+        };
+
+        /// <summary>
+        /// The Editor's asmdef: editor only, in the CoveredLot.EditorTools namespace, referencing Core and the Client, with
+        /// the precompiled references overridden with none. Unity still gives it, as every editor assembly, the Test
+        /// Framework's assemblies and their NUnit.
+        /// </summary>
+        private static readonly IReadOnlyDictionary<string, string> ExpectedEditorAsmdef = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["name"] = "\"CoveredLot.Editor\"",
+            ["rootNamespace"] = "\"CoveredLot.EditorTools\"",
+            ["references"] = "[\"CoveredLot.Core\",\"CoveredLot.Client\"]",
+            ["includePlatforms"] = "[\"Editor\"]",
+            ["excludePlatforms"] = "[]",
+            ["allowUnsafeCode"] = "false",
+            ["overrideReferences"] = "true",
+            ["precompiledReferences"] = "[]",
+            ["autoReferenced"] = "false",
+            ["defineConstraints"] = "[]",
+            ["versionDefines"] = "[]",
+            ["noEngineReferences"] = "false",
+        };
+
         /// <summary>The csc.rsp options of every CoveredLot assembly; Core also checks overflow, like its .NET build.</summary>
         private static readonly string[] OptionsOfEveryAssembly = { "-warnaserror+", "-nullable:enable" };
         private const string CoreOnlyOption = "-checked+";
@@ -58,9 +106,28 @@ namespace CoveredLot.Core.Tests
         [Fact]
         public void The_core_asmdef_is_unity_free_and_sees_only_the_two_engine_dlls()
         {
-            IReadOnlyDictionary<string, string> actual = CompactProperties(RepositoryLayout.FullPath(CoreAsmdef));
+            AssertAsmdefHolds(CoreAsmdef, ExpectedCoreAsmdef);
+        }
 
-            Assert.Equal(Sorted(ExpectedCoreAsmdef), Sorted(actual));
+        [Fact]
+        public void The_client_asmdef_references_Core_and_no_precompiled_dll()
+        {
+            AssertAsmdefHolds(ClientAsmdef, ExpectedClientAsmdef);
+        }
+
+        [Fact]
+        public void The_editor_asmdef_is_editor_only_and_references_Core_the_Client_and_no_precompiled_dll()
+        {
+            AssertAsmdefHolds(EditorAsmdef, ExpectedEditorAsmdef);
+        }
+
+        /// <summary>An asmdef that this class does not pin would be an assembly whose references nothing checks.</summary>
+        [Fact]
+        public void The_CoveredLot_folder_holds_the_Core_Client_and_Editor_asmdefs_only()
+        {
+            IReadOnlyList<string> asmdefs = Sorted(FilesWithExtension(CoveredLotFolder, ".asmdef").Select(path => RepositoryLayout.Relative(path)));
+
+            Assert.Equal(Sorted(new[] { CoreAsmdef, ClientAsmdef, EditorAsmdef }), asmdefs);
         }
 
         /// <summary>
@@ -170,6 +237,23 @@ namespace CoveredLot.Core.Tests
                 "Assets/csc.rsp applies to every assembly, packages included; give each CoveredLot asmdef its own csc.rsp.");
         }
 
+        /// <summary>Fails, naming the asmdef and each property that is missing, extra or set to another value, unless it holds exactly the pinned ones.</summary>
+        private static void AssertAsmdefHolds(string relativeAsmdef, IReadOnlyDictionary<string, string> expected)
+        {
+            IReadOnlyDictionary<string, string> actual = CompactProperties(RepositoryLayout.FullPath(relativeAsmdef));
+
+            IReadOnlyList<string> differences = expected.Keys.Union(actual.Keys, StringComparer.Ordinal)
+                .Where(property => ValueOrMissing(actual, property) != ValueOrMissing(expected, property))
+                .OrderBy(property => property, StringComparer.Ordinal)
+                .Select(property => relativeAsmdef + " sets " + property + " to " + ValueOrMissing(actual, property) + ", not " + ValueOrMissing(expected, property))
+                .ToList();
+
+            Assert.True(differences.Count == 0, string.Join("\n", differences));
+        }
+
+        private static string ValueOrMissing(IReadOnlyDictionary<string, string> properties, string property) =>
+            properties.TryGetValue(property, out string? value) ? value : "(missing)";
+
         private static IEnumerable<string> ApprovedOptions(string assembly) =>
             assembly == CoreAssembly ? OptionsOfEveryAssembly.Append(CoreOnlyOption) : OptionsOfEveryAssembly;
 
@@ -232,9 +316,6 @@ namespace CoveredLot.Core.Tests
 
             return Encoding.UTF8.GetString(buffer.ToArray());
         }
-
-        private static IReadOnlyList<KeyValuePair<string, string>> Sorted(IReadOnlyDictionary<string, string> properties) =>
-            properties.OrderBy(property => property.Key, StringComparer.Ordinal).ToList();
 
         private static IReadOnlyList<string> Sorted(IEnumerable<string> options) =>
             options.OrderBy(option => option, StringComparer.Ordinal).ToList();

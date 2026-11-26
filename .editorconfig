@@ -18,10 +18,22 @@ indent_size = 2
 [*.md]
 trim_trailing_whitespace = false
 
-# Written only by tools/sync-engine.sh: the level texts must stay byte-identical to the
-# engine's canonical output, which has no final newline.
+# Written only by tools/sync-engine.sh, apart from Unity's .meta files: editors leave the
+# bytes as the script and Unity wrote them.
 [Assets/Generated/**]
+insert_final_newline = unset
+trim_trailing_whitespace = false
+
+# The level texts and their presentation file must stay byte-identical to the engine's
+# canonical output, which has no final newline.
+[Assets/Generated/Resources/Levels/*.{txt,json}]
 insert_final_newline = false
+
+# Written by Unity, which leaves a space after an empty value ("userData: ") and ends some
+# files without a newline (a script's .meta, the Input System actions, some settings).
+# Editors leave these bytes alone, so the next Unity run has nothing to write back.
+[{Assets/**.meta,Assets/**.asset,Assets/**.unity,Assets/**.inputactions,ProjectSettings/**,Packages/packages-lock.json}]
+insert_final_newline = unset
 trim_trailing_whitespace = false
 
 [*.cs]

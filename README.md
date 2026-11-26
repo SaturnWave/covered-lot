@@ -45,7 +45,9 @@ Unity CLI, `unity open .`, or with the editor itself: `<editor> -projectPath <re
   is the only scene. For now it shows the game's title.
 - The engine DLLs are imported with Auto Reference off, so only an assembly whose asmdef
   names them compiles against them. Their two `.meta` files were set once by hand, and
-  `tools/sync-engine.sh` never rewrites a `.meta` file.
+  `tools/sync-engine.sh` never rewrites a `.meta` file. Core's asmdef names them; the
+  Client's and the Editor's name no DLL at all, so the game code also stays clear of the
+  package DLLs, such as NUnit, that Unity otherwise hands every assembly.
 
 A fresh clone has no `Library/`, so the first open imports the whole project, which takes
 several minutes. To import in batch mode, run this from the repository root in Git Bash,
@@ -56,10 +58,14 @@ with the editor closed:
 `CoveredLot.EditorTools.ProjectSetup.Apply` applies the project settings the game pins
 (portrait, the product name, the Android development build's settings, and a domain reload
 on entering Play mode) and writes the UI theme, the panel settings and the Main scene. The
-committed files already hold its result, so run it only after changing `ProjectSetup`; a
-second run changes no file:
+committed files already hold its result, so run it only after changing `ProjectSetup`:
 
     unity run . --timeout 1800 -- -executeMethod CoveredLot.EditorTools.ProjectSetup.Apply -logFile "$(pwd -W)/artifacts/local/unity/setup.log"
+
+The committed files are in the form Unity itself writes them, so a second setup run, a plain
+open and a `unity test` run change none of them. A test run matters here because, unlike
+`unity run`, it lets the editor go on after the import, and an asset that a package upgrades
+on load is saved only then.
 
 Without the CLI, start `<editor>` with `-batchmode -quit -projectPath <repo> -logFile <log>`,
 plus the `-executeMethod` argument for the setup; from PowerShell, start it through
@@ -72,7 +78,7 @@ Run these from the repository root in Git Bash:
 
 - `tools/check-repo.sh` checks the ignore and line-ending rules against a fixed table, and
   that every script is executable and fixes its locale, and that `.editorconfig` leaves the
-  level texts' bytes alone.
+  bytes of the level texts and of Unity's own files alone.
 - `tools/scan-before-push.sh` runs before every push. The repository is public, so it
   refuses to pass any secret, personal path, user name or non-noreply email in the commits
   a push would publish. `tools/scan-self-test.sh` proves it catches each kind.
@@ -97,11 +103,15 @@ check:
   stays overflow-checked;
 - that no Core source names a culture-sensitive `StringComparison` value, which the policy
   lets through;
-- the asmdef and `csc.rsp` rules, and that Unity and .NET compile the same files into Core;
+- the three asmdefs, property by property, the `csc.rsp` rules, and that Unity and .NET
+  compile the same files into Core;
 - the Unity project's files: the editor version, the Input System as the only input
   handling, the domain reload on entering Play mode, the engine DLLs' import settings, the
-  package manifest, and that no text file of the project holds a drive-letter path or a
-  user folder;
+  URP asset saved in the pinned URP's form, the package manifest, and that every `Assets/`
+  path a project setting names exists;
+- what the public repository must not hold: a Unity Cloud link, a keystore of its own, a
+  package policy other than the reviewed default, or a drive-letter path or user folder in
+  any text file of the project (`MachinePathsTests` proves the two path patterns);
 - `Assets/Generated` against its checksums and record, and every shipped level text.
 
 The script fails if either run fails, runs no test or skips one, and writes TRX results to

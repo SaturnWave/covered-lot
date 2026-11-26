@@ -2,8 +2,9 @@
 # Checks the repository's ignore and attribute rules against a fixed table, so a change to
 # .gitignore or .gitattributes cannot silently start tracking build output or secrets, or
 # stop tracking source. It also pins what the scripts and .editorconfig promise: every
-# tools/*.sh is executable and fixes its locale first, and the level texts keep no final
-# newline. It checks the repository it belongs to, from whatever folder it is started.
+# tools/*.sh is executable and fixes its locale first, the level texts keep no final newline,
+# and editors leave the bytes Unity writes alone. It checks the repository it belongs to, from
+# whatever folder it is started.
 # Exit code 0 when every expectation holds.
 export LC_ALL=C LANG=C
 set -euo pipefail
@@ -107,14 +108,27 @@ for script in tools/*.sh; do
   fi
 done
 
-# The level texts must stay byte-identical to the engine's output, which has no final newline,
-# so .editorconfig must not ask editors to add one or to trim lines under Assets/Generated.
-generated_section="$(awk '/^\[/ { in_section = ($0 == "[Assets/Generated/**]"); next } in_section' .editorconfig)"
-for setting in "insert_final_newline = false" "trim_trailing_whitespace = false"; do
-  if ! grep -q -x -F -e "$setting" <<< "$generated_section"; then
-    fail ".editorconfig does not set $setting for [Assets/Generated/**]"
-  fi
-done
+# section_sets <section header> <setting>...: fails for each setting that the .editorconfig
+# section with exactly this header does not hold.
+section_sets() {
+  local header="$1" settings setting
+  shift
+  settings="$(awk -v header="$header" '/^\[/ { in_section = ($0 == header); next } in_section' .editorconfig)"
+  for setting in "$@"; do
+    if ! grep -q -x -F -e "$setting" <<< "$settings"; then
+      fail ".editorconfig does not set $setting for $header"
+    fi
+  done
+}
+# Editors must leave Assets/Generated as the sync script and Unity wrote it, with no line
+# trimmed and no final newline added or removed; the level texts, which stay byte-identical to
+# the engine's output, keep having none.
+section_sets "[Assets/Generated/**]" "insert_final_newline = unset" "trim_trailing_whitespace = false"
+section_sets "[Assets/Generated/Resources/Levels/*.{txt,json}]" "insert_final_newline = false"
+# Unity's own files keep the trailing spaces and the missing final newlines Unity writes, so an
+# editor that saves one leaves nothing for the next Unity run to write back.
+section_sets "[{Assets/**.meta,Assets/**.asset,Assets/**.unity,Assets/**.inputactions,ProjectSettings/**,Packages/packages-lock.json}]" \
+  "insert_final_newline = unset" "trim_trailing_whitespace = false"
 
 if [ "$failures" -gt 0 ]; then
   echo "check-repo: $failures failure(s)" >&2
