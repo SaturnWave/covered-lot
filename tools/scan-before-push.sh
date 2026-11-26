@@ -90,18 +90,19 @@ split_pattern() {
 # scan_tree <where> <dir>: every file under <dir>, by its name and by its bytes.
 scan_tree() {
   local where="$1" dir="$2" entry file relative found
-  while IFS= read -r -d '' file; do
-    relative="${file#"$dir"/}"
-    if grep -E -i -q -e "$secret_file_re" <<< "$relative"; then
-      report "$where" "$relative" "secret-file-name"
-    fi
-    for entry in "${content_patterns[@]}"; do
-      split_pattern "$entry"
-      if grep -E "${pattern_case[@]+"${pattern_case[@]}"}" -q -e "$pattern_regex" <<< "$relative"; then
-        report "$where" "$relative" "$pattern_name (in the file name)"
-      fi
-    done
-  done < <(find "$dir" -type f -print0)
+  # File names: one grep per pattern over the list of names, because starting a process
+  # per file and pattern is slow on Windows.
+  local names="$work_dir/names.txt"
+  (cd "$dir" && find . -type f) | sed 's#^\./##' > "$names"
+  while IFS= read -r relative; do
+    report "$where" "$relative" "secret-file-name"
+  done < <(grep -E -i -e "$secret_file_re" "$names" || true)
+  for entry in "${content_patterns[@]}"; do
+    split_pattern "$entry"
+    while IFS= read -r relative; do
+      report "$where" "$relative" "$pattern_name (in the file name)"
+    done < <(grep -E "${pattern_case[@]+"${pattern_case[@]}"}" -e "$pattern_regex" "$names" || true)
+  done
 
   for entry in "${content_patterns[@]}"; do
     split_pattern "$entry"

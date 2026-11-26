@@ -55,6 +55,7 @@ if [ -n "$user_name" ]; then
   c_user="$(plant "$dirty" user.txt "written by $user_name")"
 fi
 c_email="$(plant "$dirty" plain.txt "nothing to see" "$outside_email")"
+c_name="$(plant "$dirty" "server.$(printf '%s' pem)" "nothing secret inside")"
 
 set +e
 output="$(cd "$dirty" && "$scan" 2>&1)"
@@ -76,6 +77,7 @@ else
   echo "skip  no USERNAME or USER in the environment, so the user-name case is not planted"
 fi
 expect_hit "$output" "$c_email" "author-or-committer-email"
+expect_hit "$output" "$c_name" "secret-file-name"
 if grep -F -q -e "$outside_email" <<< "$output"; then
   echo "FAIL  the scan printed a matched value"
   failures=$((failures + 1))
