@@ -1,0 +1,7 @@
+engine-repository https://github.com/SaturnWave/puzzle-engine
+engine-commit 9039d7c4f86f7a094e66a5083f6d402e0a21a918
+dotnet-sdk 10.0.400
+configuration Release
+gen campaign-jam 100
+example packs/jam/golden/six-by-six.pc-lot
+levels 98

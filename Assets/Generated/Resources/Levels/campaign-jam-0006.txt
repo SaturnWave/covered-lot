@@ -1,0 +1,8 @@
+pc-lot
+r=1
+size=6x6
+bays=5
+pillars=27
+vehicles=Y:2:2:N;B:3:2:N;B:4:2:E;R:6:2:W;R:11:2:S;B:12:2:W;Y:18:2:W;R:20:2:S;R:22:2:N;Y:24:2:N;R:32:2:W;R:34:2:E
+covers=
+clues=
