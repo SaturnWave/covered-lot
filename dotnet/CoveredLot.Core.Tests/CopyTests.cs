@@ -68,12 +68,16 @@ namespace CoveredLot.Core.Tests
         [Fact]
         public void The_development_line_cases_reach_every_kind_of_catalogue_problem()
         {
-            IEnumerable<string> kinds = LineCases.Values
-                .SelectMany(lineCase => ProblemsOf(LevelCatalogue.Load(lineCase().Texts)))
-                .Select(problem => problem.GetType().Name)
-                .Distinct();
+            var kinds = new SortedSet<string>(StringComparer.Ordinal);
+            foreach (Func<LineCase> lineCase in LineCases.Values)
+            {
+                foreach (CatalogueProblem problem in ProblemsOf(LevelCatalogue.Load(lineCase().Texts)))
+                {
+                    kinds.Add(problem.GetType().Name);
+                }
+            }
 
-            Assert.Equal(CaseNamesOf(typeof(CatalogueProblem)), kinds.Order(StringComparer.Ordinal));
+            Assert.Equal(CaseNamesOf(typeof(CatalogueProblem)), kinds);
         }
 
         [Theory]
@@ -117,10 +121,14 @@ namespace CoveredLot.Core.Tests
         {
             LotTextProblem[] values = Enum.GetValues<LotTextProblem>();
 
-            IReadOnlyList<string> words = values.Select(value => Copy.Of(value)).ToList();
+            var words = new HashSet<string>(StringComparer.Ordinal);
+            foreach (LotTextProblem value in values)
+            {
+                words.Add(Copy.Of(value));
+            }
 
             Assert.NotEmpty(values);
-            Assert.Equal(values.Length, words.Distinct(StringComparer.Ordinal).Count());
+            Assert.Equal(values.Length, words.Count);
         }
 
         /// <summary>A value the engine adds reaches the map's discard arm, which throws UnknownEngineCaseException, and fails this test.</summary>
@@ -129,10 +137,14 @@ namespace CoveredLot.Core.Tests
         {
             LoadProblem[] values = Enum.GetValues<LoadProblem>();
 
-            IReadOnlyList<string> words = values.Select(value => Copy.Of(value)).ToList();
+            var words = new HashSet<string>(StringComparer.Ordinal);
+            foreach (LoadProblem value in values)
+            {
+                words.Add(Copy.Of(value));
+            }
 
             Assert.NotEmpty(values);
-            Assert.Equal(values.Length, words.Distinct(StringComparer.Ordinal).Count());
+            Assert.Equal(values.Length, words.Count);
         }
 
         [Fact]
@@ -157,7 +169,7 @@ namespace CoveredLot.Core.Tests
         [InlineData("betray", "holds the word tray")]
         [InlineData("dashBoard", "holds the word board")]
         [InlineData("blocked", "holds the word block")]
-        [InlineData("café", "holds a character that is not printable ASCII")]
+        [InlineData("caf\u00E9", "holds a character that is not printable ASCII")]
         [InlineData("tab\there", "holds a character that is not printable ASCII")]
         [InlineData("line\n", "holds a character that is not printable ASCII")]
         public void The_copy_rules_report_each_planted_break(string line, string rule)
@@ -177,18 +189,50 @@ namespace CoveredLot.Core.Tests
         /// <summary>Every string of the catalogue's copy: the title, the problem screen's sentence, the words of both maps, and the development line of every problem the cases and the broken texts give.</summary>
         private static IReadOnlyList<string> CatalogueCopy()
         {
-            IEnumerable<FakeLevelTexts> fakes = LineCases.Values.Select(lineCase => lineCase().Texts)
-                .Concat(BrokenLevelTexts.ByCase.Values.SelectMany(broken => new[]
+            var lines = new List<string> { Copy.GameTitle, Copy.LevelsNotLoaded };
+            foreach (LotTextProblem value in Enum.GetValues<LotTextProblem>())
+            {
+                lines.Add(Copy.Of(value));
+            }
+
+            foreach (LoadProblem value in Enum.GetValues<LoadProblem>())
+            {
+                lines.Add(Copy.Of(value));
+            }
+
+            foreach (FakeLevelTexts fake in BrokenFakes())
+            {
+                foreach (CatalogueProblem problem in ProblemsOf(LevelCatalogue.Load(fake)))
                 {
-                    FakeLevelTexts.Shipped().WithLevel(FakeLevelTexts.Id("campaign-jam-0003"), broken.Text),
-                    FakeLevelTexts.Shipped().WithExample(broken.Text),
-                }))
-                .Concat(BrokenPresentations.ByCase.Values.Select(presentation => FakeLevelTexts.Shipped().WithPresentation(presentation)));
-            return new[] { Copy.GameTitle, Copy.LevelsNotLoaded }
-                .Concat(Enum.GetValues<LotTextProblem>().Select(value => Copy.Of(value)))
-                .Concat(Enum.GetValues<LoadProblem>().Select(value => Copy.Of(value)))
-                .Concat(fakes.SelectMany(fake => ProblemsOf(LevelCatalogue.Load(fake))).Select(Copy.ProblemLine))
-                .ToList();
+                    lines.Add(Copy.ProblemLine(problem));
+                }
+            }
+
+            return lines;
+        }
+
+        /// <summary>The texts of every development-line case, and the shipped texts with each broken level text as slot 3 and as the Example, and with each broken presentation file.</summary>
+        private static IReadOnlyList<FakeLevelTexts> BrokenFakes()
+        {
+            var fakes = new List<FakeLevelTexts>();
+            foreach (Func<LineCase> lineCase in LineCases.Values)
+            {
+                fakes.Add(lineCase().Texts);
+            }
+
+            FakeLevelTexts shipped = FakeLevelTexts.Shipped();
+            foreach (BrokenLevelText broken in BrokenLevelTexts.ByCase.Values)
+            {
+                fakes.Add(shipped.WithLevel(FakeLevelTexts.Id("campaign-jam-0003"), broken.Text));
+                fakes.Add(shipped.WithExample(broken.Text));
+            }
+
+            foreach (string presentation in BrokenPresentations.ByCase.Values)
+            {
+                fakes.Add(shipped.WithPresentation(presentation));
+            }
+
+            return fakes;
         }
 
         private static IEnumerable<CatalogueProblem> ProblemsOf(CatalogueResult result) => Assert.IsType<CatalogueResult.Broken>(result).Problems;

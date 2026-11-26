@@ -184,7 +184,7 @@ namespace CoveredLot.Shared
     /// (Core has none at all), async state machines, static fields that can be reassigned, the external types each type
     /// declares, the members each method body names with their signatures and IL offsets, the structs set to their
     /// default value (these two serve the Client's own rules, <see cref="ClientRules"/>), and the overflow-checked
-    /// arithmetic, which shows that a build checked overflow.
+    /// arithmetic, which shows that a build checked overflow where no source opens a checked context of its own.
     /// </summary>
     internal sealed class AssemblyScanner : IDisposable
     {
@@ -519,11 +519,13 @@ namespace CoveredLot.Shared
 
         /// <summary>
         /// Every overflow-checked addition, subtraction and multiplication (add.ovf, sub.ovf, mul.ovf and their .un forms)
-        /// in every method body, with its location. The compiler writes these for integer arithmetic in a checked context
-        /// only: inside checked(...) or a checked block, or anywhere in an assembly built with overflow checks
-        /// (CheckForOverflowUnderflow in MSBuild, -checked+ in a csc.rsp). Where no source opens a checked context of its
-        /// own, finding one shows that the build checked overflow; the plain add and sub the compiler writes for its own
-        /// lowering, whatever the setting, are not listed.
+        /// in every method body, with its location, but for the size check of a stackalloc. The compiler writes these for
+        /// integer arithmetic in a checked context only: inside checked(...) or a checked block, or anywhere in an assembly
+        /// built with overflow checks (CheckForOverflowUnderflow in MSBuild, -checked+ in a csc.rsp). It writes one more in
+        /// any context: for a stackalloc whose size is not a constant it multiplies the count by the element size with
+        /// mul.ovf.un, right before localloc, so that instruction is left out (piece 4's review). Where no source opens a
+        /// checked context of its own, finding one shows that the build checked overflow; the plain add and sub the
+        /// compiler writes for its own lowering, whatever the setting, are not listed.
         /// </summary>
         public IReadOnlyList<LocatedInstruction> OverflowCheckedArithmetic()
         {
@@ -531,13 +533,28 @@ namespace CoveredLot.Shared
             foreach (MethodDefinitionHandle methodHandle in AllMethods())
             {
                 string method = Describe(methodHandle);
-                found.AddRange(Instructions(methodHandle)
-                    .Where(instruction => OverflowCheckedArithmeticOpCodes.Contains(instruction.OpCode.Value))
-                    .Select(instruction => new LocatedInstruction { Location = At(method, instruction.Offset), OpCodeName = instruction.OpCode.Name ?? string.Empty }));
+                IReadOnlyList<Instruction> instructions = Instructions(methodHandle).ToList();
+                for (int index = 0; index < instructions.Count; index++)
+                {
+                    Instruction instruction = instructions[index];
+                    if (OverflowCheckedArithmeticOpCodes.Contains(instruction.OpCode.Value) && !IsStackallocSizeCheck(instructions, index))
+                    {
+                        found.Add(new LocatedInstruction { Location = At(method, instruction.Offset), OpCodeName = instruction.OpCode.Name ?? string.Empty });
+                    }
+                }
             }
 
             return found;
         }
+
+        /// <summary>
+        /// Whether the instruction at the index is the mul.ovf.un that the compiler writes right before localloc, whatever
+        /// the context, to check a stackalloc's size in bytes.
+        /// </summary>
+        private static bool IsStackallocSizeCheck(IReadOnlyList<Instruction> instructions, int index) =>
+            instructions[index].OpCode == OpCodes.Mul_Ovf_Un
+            && index + 1 < instructions.Count
+            && instructions[index + 1].OpCode == OpCodes.Localloc;
 
         private IEnumerable<Violation> PolicyViolationsAt(MethodDefinitionHandle method, FlowStep step, CallerContext caller, IPlatformApiPolicy policy)
         {

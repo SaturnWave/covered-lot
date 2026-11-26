@@ -1,3 +1,5 @@
+using System;
+
 namespace CoveredLot.Shared.Samples
 {
     /// <summary>
@@ -27,5 +29,18 @@ namespace CoveredLot.Shared.Samples
 
         /// <summary>A plain add, which wraps instead of throwing.</summary>
         public static int NextWrapping(int value) => unchecked(value + 1);
+
+        /// <summary>
+        /// A stackalloc whose size is not a constant, in an unchecked context: the compiler still checks the size in bytes,
+        /// the count times the element size, with mul.ovf.un right before localloc, which the scan leaves out.
+        /// </summary>
+        public static int StackallocLength(int count)
+        {
+            unchecked
+            {
+                Span<int> values = stackalloc int[count];
+                return values.Length;
+            }
+        }
     }
 }

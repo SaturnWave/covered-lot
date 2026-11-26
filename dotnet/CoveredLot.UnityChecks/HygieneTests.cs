@@ -12,8 +12,9 @@ namespace CoveredLot.UnityChecks
     /// System.Random or UnityEngine.Random; Core, the Client and the Editor have no async state machine, which holds a
     /// compiler-written generic catch; and Core has no catch block at all and no static field that can be reassigned. A
     /// catch of a specific type with a when-filter passes outside Core. Unity's build of Core also holds overflow-checked
-    /// arithmetic (add.ovf, sub.ovf or mul.ovf), which shows that Unity applied the -checked+ of Core's csc.rsp: no Core
-    /// source opens a checked context of its own (CoveredLot.Core.Tests checks the sources). CoveredLot.Core.Tests shows
+    /// arithmetic (add.ovf, sub.ovf or mul.ovf, not counting the mul.ovf.un the compiler writes for a stackalloc's size in
+    /// any context), which shows that Unity applied the -checked+ of Core's csc.rsp: no Core source holds the word checked,
+    /// so none opens a checked context of its own (CoveredLot.Core.Tests checks the sources). CoveredLot.Core.Tests shows
     /// each rule on planted samples (HygieneTests there); these apply them to Unity's compiler output.
     /// </summary>
     public sealed class HygieneTests

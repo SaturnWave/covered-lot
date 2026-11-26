@@ -7,6 +7,7 @@ using CoveredLot.Core.Catalogue;
 using CoveredLot.Core.Tests.Support;
 using PuzzleCore;
 using PuzzleCore.Jam;
+using PuzzleCore.Packs;
 using PuzzleCore.Records;
 using Xunit;
 using static CoveredLot.Core.Tests.Support.CatalogueDescriptions;
@@ -25,6 +26,7 @@ namespace CoveredLot.Core.Tests
     {
         private const string Level0003 = "campaign-jam-0003";
         private const string Level0071 = "campaign-jam-0071";
+        private const string Level0083 = "campaign-jam-0083";
         private const string Listed0003 = "Listed(campaign-jam-0003, slot 3)";
 
         /// <summary>The par of the Example that the engine's solver finds for the brief's 6x6 board (design section 7).</summary>
@@ -62,10 +64,35 @@ namespace CoveredLot.Core.Tests
 
             Assert.NotEmpty(file);
             Assert.Equal(textNames.Count, entries.Count);
-            IReadOnlyList<string> differing = textNames
-                .Where((name, index) => LotText.Write(entries[index].Level) != ShippedLevels.Text(name))
-                .ToList();
+            var differing = new List<string>();
+            for (int index = 0; index < textNames.Count; index++)
+            {
+                if (LotText.Write(entries[index].Level) != ShippedLevels.Text(textNames[index]))
+                {
+                    differing.Add(textNames[index]);
+                }
+            }
+
             Assert.True(differing.Count == 0, "These entries hold a level that does not write back to their text: " + string.Join(", ", differing) + ".");
+        }
+
+        /// <summary>
+        /// A listed level's par is the peakPar its presentation entry gives. Every shipped level's peakPar is also its bays less
+        /// its plan's minFreeCapacity, so the shipped texts cannot tell the two apart; this pack gives campaign-jam-0000 a
+        /// peakPar of 4 where those give 3, which the engine's reader does not cross-check.
+        /// </summary>
+        [Fact]
+        public void A_listed_level_s_par_is_the_peakPar_of_its_presentation_entry()
+        {
+            LotLevel level0000 = Loaded(ShippedLevels.Text("campaign-jam-0000"));
+            PresentationLevel listed = Assert.Single(
+                Assert.IsType<PresentationReadResult.Read>(PresentationJson.Read(FakePresentations.JamPackOfLevel0000WithPeakPar4)).File.Levels);
+
+            CatalogueResult result = LevelCatalogue.Load(FakeLevelTexts.Shipped().WithPresentation(FakePresentations.JamPackOfLevel0000WithPeakPar4));
+
+            // The premise, from the engine: the level's bays less its entry's minFreeCapacity give 3, not the 4 its peakPar gives.
+            Assert.Equal(3, level0000.Bays.AsCapacity.Value - listed.Grade.Plan.MinFreeCapacity.Value);
+            Assert.Equal(new[] { "Example, no slot, par " + Number(ExamplePeakPar), "Level 1, slot 0, par 4" }, EntriesOf(result).Select(Entry));
         }
 
         [Fact]
@@ -234,6 +261,26 @@ namespace CoveredLot.Core.Tests
             Assert.Equal(new[] { "ExamplePeakParNotFound" }, ProblemsOf(result));
         }
 
+        /// <summary>
+        /// The Example's par is searched with all its bays and a budget of many nodes. A shipped level as the Example whose
+        /// par takes all five of its bays and 5,256 nodes gets that par (the brief's 6x6 board takes three of its four bays and
+        /// 14 nodes, so it cannot show either). This pins a budget of at least 5,256 nodes, not the 1,000,000 itself: no
+        /// shipped level needs more than 10,000.
+        /// </summary>
+        [Fact]
+        public void An_Example_whose_par_takes_all_its_bays_and_thousands_of_nodes_gets_that_par()
+        {
+            LotLevel level0083 = Loaded(ShippedLevels.Text(Level0083));
+
+            CatalogueResult result = LevelCatalogue.Load(FakeLevelTexts.Shipped().WithExample(ShippedLevels.Text(Level0083)));
+
+            // The premises, from the engine itself: one bay fewer wins no order, and 1,000 nodes are too few.
+            Assert.Equal(5, level0083.Bays.AsCapacity.Value);
+            Assert.IsType<PeakParResult.Unsolvable>(LotSolver.PeakPar(level0083, new CapacityCount(4), new NodeBudget(1_000_000)));
+            Assert.IsType<PeakParResult.BudgetExceeded>(LotSolver.PeakPar(level0083, level0083.Bays.AsCapacity, new NodeBudget(1_000)));
+            Assert.Equal("Example, no slot, par 5", Entry(EntriesOf(result)[0]));
+        }
+
         [Fact]
         public void A_Jam_pack_that_lists_no_level_gives_the_Example_alone()
         {
@@ -312,15 +359,22 @@ namespace CoveredLot.Core.Tests
         private static IReadOnlyList<FileLevel> PresentationFileLevels()
         {
             using JsonDocument document = JsonDocument.Parse(File.ReadAllBytes(ShippedLevels.PresentationPath()));
-            return document.RootElement.GetProperty("levels").EnumerateArray()
-                .Select(level => new FileLevel
-                {
-                    Id = level.GetProperty("levelId").GetString() ?? throw new InvalidDataException("A level of presentation.json has a null levelId."),
-                    Slot = level.GetProperty("slot").GetInt32(),
-                    PeakPar = level.GetProperty("plan").GetProperty("peakPar").GetInt32(),
-                })
-                .ToList();
+            var levels = new List<FileLevel>();
+            foreach (JsonElement level in document.RootElement.GetProperty("levels").EnumerateArray())
+            {
+                levels.Add(FileLevelOf(level));
+            }
+
+            return levels;
         }
+
+        /// <summary>One level of presentation.json; a missing or mistyped field throws and fails the test.</summary>
+        private static FileLevel FileLevelOf(JsonElement level) => new()
+        {
+            Id = level.GetProperty("levelId").GetString() ?? throw new InvalidDataException("A level of presentation.json has a null levelId."),
+            Slot = level.GetProperty("slot").GetInt32(),
+            PeakPar = level.GetProperty("plan").GetProperty("peakPar").GetInt32(),
+        };
 
         /// <summary>A level as presentation.json lists it: its id, its slot and its plan's peakPar.</summary>
         private sealed record FileLevel

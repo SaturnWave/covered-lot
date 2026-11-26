@@ -27,7 +27,6 @@ namespace CoveredLot.UnityChecks.Support
     {
         public const string ScriptAssembliesFolder = "Library/ScriptAssemblies";
         public const string RunsFolder = "artifacts/local/unity";
-        public const string AsmdefExtension = ".asmdef";
 
         private const string ProjectVersionFile = "ProjectSettings/ProjectVersion.txt";
         private const string EditorVersionKey = "m_EditorVersion: ";
@@ -43,7 +42,7 @@ namespace CoveredLot.UnityChecks.Support
             var assemblies = new List<UnityAssembly>();
             foreach (string folder in AssemblyFolders)
             {
-                foreach (string asmdef in RepositoryLayout.FilesWithExtension(folder, AsmdefExtension))
+                foreach (string asmdef in RepositoryLayout.FilesWithExtension(folder, FileExtension.Asmdef))
                 {
                     assemblies.Add(AssemblyOf(asmdef));
                 }
@@ -108,8 +107,6 @@ namespace CoveredLot.UnityChecks.Support
     /// <summary>A CoveredLot assembly: its name, and the folder of its asmdef, from the repository root with '/' separators.</summary>
     internal sealed record UnityAssembly
     {
-        private const string CSharpExtension = ".cs";
-
         public required string Name { get; init; }
 
         public required string Folder { get; init; }
@@ -139,7 +136,7 @@ namespace CoveredLot.UnityChecks.Support
         public CurrentSources SourcesNow()
         {
             var files = new List<CurrentSource>();
-            foreach (string source in Sources().Where(path => RepositoryLayout.HasExtension(path, CSharpExtension)))
+            foreach (string source in Sources().Where(path => RepositoryLayout.HasExtension(path, FileExtension.CSharp)))
             {
                 files.Add(new CurrentSource { RelativePath = RepositoryLayout.Relative(source), Content = File.ReadAllBytes(source).ToImmutableArray() });
             }
@@ -153,7 +150,7 @@ namespace CoveredLot.UnityChecks.Support
             sources.AddRange(Directory.EnumerateFiles(folder).Where(IsSource));
             foreach (string below in Directory.EnumerateDirectories(folder))
             {
-                if (!Directory.EnumerateFiles(below).Any(file => RepositoryLayout.HasExtension(file, UnityOutputs.AsmdefExtension)))
+                if (!Directory.EnumerateFiles(below).Any(file => RepositoryLayout.HasExtension(file, FileExtension.Asmdef)))
                 {
                     AddSources(below, sources);
                 }
@@ -161,8 +158,8 @@ namespace CoveredLot.UnityChecks.Support
         }
 
         private static bool IsSource(string path) =>
-            RepositoryLayout.HasExtension(path, CSharpExtension)
-            || RepositoryLayout.HasExtension(path, UnityOutputs.AsmdefExtension)
+            RepositoryLayout.HasExtension(path, FileExtension.CSharp)
+            || RepositoryLayout.HasExtension(path, FileExtension.Asmdef)
             || string.Equals(Path.GetFileName(path), "csc.rsp", StringComparison.OrdinalIgnoreCase);
     }
 

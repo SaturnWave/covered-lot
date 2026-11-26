@@ -26,6 +26,13 @@ namespace CoveredLot.Core.Tests.Support
         public const string JamPackWithALevelWithoutPar =
             $$"""{"format":"pc-presentation","formatVersion":1,"game":"Jam","levels":[{{JamLevel0000WithoutPar}}],"packId":"campaign-jam"}""";
 
+        /// <summary>
+        /// A Jam pack that lists campaign-jam-0000 with a peakPar of 4, where its bays less its minFreeCapacity give 3, as
+        /// presentation.json's 3 does: the engine's reader does not compare the two.
+        /// </summary>
+        public const string JamPackOfLevel0000WithPeakPar4 =
+            $$"""{"format":"pc-presentation","formatVersion":1,"game":"Jam","levels":[{{JamLevel0000WithPeakPar4}}],"packId":"campaign-jam"}""";
+
         private const string Zeros = "0000000000000000000000000000000000000000000000000000000000000000";
 
         private const string SortLevel0000 =
@@ -39,5 +46,8 @@ namespace CoveredLot.Core.Tests.Support
 
         private const string JamLevel0000WithoutPar =
             $$"""{"fingerprint":"{{Zeros}}","kind":"Plan","levelId":"campaign-jam-0000","plan":{"deadEnd":452,"minFreeCapacity":2,"par":9,"spareNeed":0},"slot":0}""";
+
+        private const string JamLevel0000WithPeakPar4 =
+            $$"""{"fingerprint":"{{Zeros}}","kind":"Plan","levelId":"campaign-jam-0000","plan":{"deadEnd":452,"minFreeCapacity":2,"par":9,"peakPar":4,"spareNeed":0},"slot":0}""";
     }
 }

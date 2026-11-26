@@ -213,7 +213,7 @@ namespace CoveredLot.Core.Tests
         [Fact]
         public void The_CoveredLot_folder_holds_the_Core_Client_and_Editor_asmdefs_only()
         {
-            IReadOnlyList<string> asmdefs = Sorted(RepositoryLayout.FilesWithExtension(CoveredLotFolder, ".asmdef").Select(path => RepositoryLayout.Relative(path)));
+            IReadOnlyList<string> asmdefs = Sorted(RepositoryLayout.FilesWithExtension(CoveredLotFolder, FileExtension.Asmdef).Select(path => RepositoryLayout.Relative(path)));
 
             Assert.Equal(Sorted(new[] { CoreAsmdef, ClientAsmdef, EditorAsmdef }), asmdefs);
         }
@@ -221,7 +221,7 @@ namespace CoveredLot.Core.Tests
         [Fact]
         public void The_Tests_folder_holds_the_Support_EditMode_and_PlayMode_asmdefs_only()
         {
-            IReadOnlyList<string> asmdefs = Sorted(RepositoryLayout.FilesWithExtension(TestsFolder, ".asmdef").Select(path => RepositoryLayout.Relative(path)));
+            IReadOnlyList<string> asmdefs = Sorted(RepositoryLayout.FilesWithExtension(TestsFolder, FileExtension.Asmdef).Select(path => RepositoryLayout.Relative(path)));
 
             Assert.Equal(Sorted(new[] { SupportAsmdef, EditModeAsmdef, PlayModeAsmdef }), asmdefs);
         }
@@ -236,7 +236,7 @@ namespace CoveredLot.Core.Tests
             IReadOnlyList<string> folders = new[] { CoreAsmdef, ClientAsmdef, EditorAsmdef, SupportAsmdef, EditModeAsmdef, PlayModeAsmdef }
                 .Select(asmdef => asmdef[..(asmdef.LastIndexOf('/') + 1)])
                 .ToList();
-            IReadOnlyList<string> sources = RepositoryLayout.FilesWithExtension("Assets", ".cs").Select(path => RepositoryLayout.Relative(path)).ToList();
+            IReadOnlyList<string> sources = RepositoryLayout.FilesWithExtension("Assets", FileExtension.CSharp).Select(path => RepositoryLayout.Relative(path)).ToList();
 
             IReadOnlyList<string> outside = sources.Where(source => !folders.Any(folder => source.StartsWith(folder, StringComparison.Ordinal))).ToList();
 
@@ -268,7 +268,7 @@ namespace CoveredLot.Core.Tests
         [Fact]
         public void No_asmdef_under_Assets_allows_unsafe_code()
         {
-            IReadOnlyList<string> asmdefs = RepositoryLayout.FilesWithExtension("Assets", ".asmdef");
+            IReadOnlyList<string> asmdefs = RepositoryLayout.FilesWithExtension("Assets", FileExtension.Asmdef);
             var unsafeOnes = new List<string>();
             foreach (string asmdef in asmdefs)
             {
@@ -286,8 +286,8 @@ namespace CoveredLot.Core.Tests
         [Fact]
         public void The_Core_folder_holds_the_Core_asmdef_and_no_other_asmdef_or_asmref()
         {
-            IEnumerable<string> definitions = RepositoryLayout.FilesWithExtension(CoreFolder, ".asmdef")
-                .Concat(RepositoryLayout.FilesWithExtension(CoreFolder, ".asmref"))
+            IEnumerable<string> definitions = RepositoryLayout.FilesWithExtension(CoreFolder, FileExtension.Asmdef)
+                .Concat(RepositoryLayout.FilesWithExtension(CoreFolder, FileExtension.Asmref))
                 .Select(path => RepositoryLayout.Relative(path));
 
             Assert.Equal(new[] { CoreAsmdef }, definitions);
@@ -302,7 +302,7 @@ namespace CoveredLot.Core.Tests
         [Fact]
         public void No_asmref_lies_under_Assets()
         {
-            IReadOnlyList<string> asmrefs = RepositoryLayout.FilesWithExtension("Assets", ".asmref").Select(path => RepositoryLayout.Relative(path)).ToList();
+            IReadOnlyList<string> asmrefs = RepositoryLayout.FilesWithExtension("Assets", FileExtension.Asmref).Select(path => RepositoryLayout.Relative(path)).ToList();
 
             Assert.True(asmrefs.Count == 0,
                 "Unity compiles the folder of each of these into the assembly it names, not into the assembly of the asmdef above it: " + string.Join(", ", asmrefs));
@@ -328,7 +328,7 @@ namespace CoveredLot.Core.Tests
         [Fact]
         public void No_dll_lies_under_Assets_but_the_two_engine_dlls()
         {
-            IReadOnlyList<string> dlls = Sorted(RepositoryLayout.FilesWithExtension("Assets", ".dll").Select(path => RepositoryLayout.Relative(path)));
+            IReadOnlyList<string> dlls = Sorted(RepositoryLayout.FilesWithExtension("Assets", FileExtension.Dll).Select(path => RepositoryLayout.Relative(path)));
 
             Assert.Equal(Sorted(EngineDlls), dlls);
         }
@@ -336,7 +336,7 @@ namespace CoveredLot.Core.Tests
         [Fact]
         public void No_Core_source_lies_where_Unity_does_not_import_it()
         {
-            IReadOnlyList<string> sources = RepositoryLayout.FilesWithExtension(CoreFolder, ".cs").Select(path => RepositoryLayout.Relative(path)).ToList();
+            IReadOnlyList<string> sources = RepositoryLayout.FilesWithExtension(CoreFolder, FileExtension.CSharp).Select(path => RepositoryLayout.Relative(path)).ToList();
 
             IReadOnlyList<string> hidden = sources.Where(UnityAssets.IsHidden).ToList();
 
@@ -347,7 +347,7 @@ namespace CoveredLot.Core.Tests
         [Fact]
         public void Every_asmdef_folder_of_the_game_and_its_tests_has_a_csc_rsp_with_exactly_the_approved_options()
         {
-            IReadOnlyList<string> asmdefs = RepositoryLayout.FilesWithExtension(CoveredLotFolder, ".asmdef").Concat(RepositoryLayout.FilesWithExtension(TestsFolder, ".asmdef")).ToList();
+            IReadOnlyList<string> asmdefs = RepositoryLayout.FilesWithExtension(CoveredLotFolder, FileExtension.Asmdef).Concat(RepositoryLayout.FilesWithExtension(TestsFolder, FileExtension.Asmdef)).ToList();
             var problems = new List<string>();
             foreach (string asmdef in asmdefs)
             {

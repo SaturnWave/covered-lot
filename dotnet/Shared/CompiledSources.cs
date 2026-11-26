@@ -117,7 +117,7 @@ namespace CoveredLot.Shared
             var inFolder = new Dictionary<string, CompiledDocument>(StringComparer.Ordinal);
             foreach (CompiledDocument document in compiled)
             {
-                if (RelativePathInFolder(document.Name, current.Folder) is string relativePath)
+                if (RelativePathInFolder(document, current) is string relativePath)
                 {
                     inFolder[relativePath] = document;
                 }
@@ -150,14 +150,14 @@ namespace CoveredLot.Shared
         }
 
         /// <summary>
-        /// The document's path from the repository root when it lies in the folder; null otherwise. The PDB records the path
-        /// the compiler was given, whose start differs between machines and builds, so the folder is found as a run of whole
-        /// names in it.
+        /// The document's path from the repository root when it lies in the folder of the current sources; null otherwise.
+        /// The PDB records the path the compiler was given, whose start differs between machines and builds, so the folder
+        /// is found as a run of whole names in it.
         /// </summary>
-        private static string? RelativePathInFolder(string documentName, string folder)
+        private static string? RelativePathInFolder(CompiledDocument document, CurrentSources current)
         {
-            string path = documentName.Replace('\\', '/');
-            int at = path.IndexOf("/" + folder + "/", StringComparison.Ordinal);
+            string path = document.Name.Replace('\\', '/');
+            int at = path.IndexOf("/" + current.Folder + "/", StringComparison.Ordinal);
             return at < 0 ? null : path[(at + 1)..];
         }
 

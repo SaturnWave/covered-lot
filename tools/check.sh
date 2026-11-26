@@ -22,7 +22,8 @@
 #      assemblies, the sources their PDBs record, and the reports and logs of the four runs.
 # It needs the Unity CLI (`unity`) and the .NET SDK that dotnet/global.json pins, and the Unity editor closed: it
 # refuses to start while Temp/UnityLockfile exists. Once the project is imported, a full run takes two to four minutes,
-# most of it the four Unity runs; in a fresh clone the first run imports the whole project first. It checks the
+# most of it the four Unity runs; in a fresh clone the first run imports the whole project first, which can take half an
+# hour on a loaded machine, so the first run's timeout is an hour and each other run's half an hour. It checks the
 # repository it belongs to, from whatever folder it is started.
 #
 # Usage: tools/check.sh
@@ -32,6 +33,9 @@ set -euo pipefail
 
 readonly MODES=(EditMode PlayMode)
 readonly CULTURES=(tr-TR sv-SE)
+# The first run of a fresh clone imports the whole project before its tests: 7 minutes on a quiet machine, but more than
+# 30 while another Unity build ran (piece 4's review), so the first run gets an hour, as piece 9's first import did.
+readonly UNITY_FIRST_RUN_TIMEOUT_SECONDS=3600
 readonly UNITY_TIMEOUT_SECONDS=1800
 readonly LOCK_FILE=Temp/UnityLockfile
 readonly RUNS_DIR=artifacts/local/unity
@@ -77,18 +81,25 @@ step() {
   echo "check: $outcome  $name"
 }
 
-# unity_tests <mode> <culture>: one Unity test run. The CLI's own output goes to <run>.cli.txt next to the report. A run
-# that the CLI ended (exit code 6) can leave Temp/UnityLockfile behind; the editor of the next run starts all the same.
+# unity_tests <mode> <culture> <timeout seconds>: one Unity test run. The CLI's own output goes to <run>.cli.txt next to
+# the report; when the CLI stops an editor at the timeout, only that file says so, not the editor's log. A run that the
+# CLI ended (exit code 6) can leave Temp/UnityLockfile behind; the editor of the next run starts all the same.
 unity_tests() {
-  local mode="$1" culture="$2"
-  local run="$mode-$culture" status=0
+  local mode="$1" culture="$2" timeout_seconds="$3"
+  local run="$mode-$culture" status=0 started=$SECONDS
   PUZZLE_TEST_CULTURE="$culture" unity test . --mode "$mode" --output "$repo_root/$RUNS_DIR/$run.xml" \
-    --timeout "$UNITY_TIMEOUT_SECONDS" --no-banner -- -logFile "$repo_root/$RUNS_DIR/$run.log" \
+    --timeout "$timeout_seconds" --no-banner -- -logFile "$repo_root/$RUNS_DIR/$run.log" \
     > "$RUNS_DIR/$run.cli.txt" 2>&1 || status=$?
   case "$status" in
     0) echo "check: the $run run ended with exit code 0; UnityChecks reads its report" ;;
     8) echo "check: tests failed in the $run run; see $RUNS_DIR/$run.xml" >&2 ;;
-    6) echo "check: the $run run gave no verdict (a compile error, the licence, a crash or the timeout); see $RUNS_DIR/$run.log" >&2 ;;
+    6)
+      if [ $((SECONDS - started)) -ge "$timeout_seconds" ]; then
+        echo "check: the $run run gave no verdict: it reached its timeout of $timeout_seconds s; see $RUNS_DIR/$run.cli.txt and $RUNS_DIR/$run.log" >&2
+      else
+        echo "check: the $run run gave no verdict (a compile error, the licence or a crash); see $RUNS_DIR/$run.log and $RUNS_DIR/$run.cli.txt" >&2
+      fi
+      ;;
     *) echo "check: the $run run ended with exit code $status; see $RUNS_DIR/$run.cli.txt" >&2 ;;
   esac
   return "$status"
@@ -175,9 +186,11 @@ done
 rm -f "$SCRIPT_ASSEMBLIES_DIR"/CoveredLot*.dll "$SCRIPT_ASSEMBLIES_DIR"/CoveredLot*.pdb \
   "$SCRIPT_ASSEMBLIES_DIR"/Assembly-CSharp*.dll "$SCRIPT_ASSEMBLIES_DIR"/Assembly-CSharp*.pdb \
   "$BEE_ARTIFACTS_DIR"/*.dag/CoveredLot.*.dll "$BEE_ARTIFACTS_DIR"/*.dag/CoveredLot.*.pdb
+timeout_seconds=$UNITY_FIRST_RUN_TIMEOUT_SECONDS
 for mode in "${MODES[@]}"; do
   for culture in "${CULTURES[@]}"; do
-    step "Unity $mode tests under $culture" unity_tests "$mode" "$culture"
+    step "Unity $mode tests under $culture" unity_tests "$mode" "$culture" "$timeout_seconds"
+    timeout_seconds=$UNITY_TIMEOUT_SECONDS
   done
 done
 step "the repository after the Unity runs" repository_unchanged "$state_before"

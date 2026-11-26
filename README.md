@@ -82,7 +82,12 @@ Run these from the repository root in Git Bash:
   each under tr-TR and under sv-SE, and then `dotnet/CoveredLot.UnityChecks` under both
   cultures. It needs the Unity CLI (`unity`) and the .NET SDK, and the Unity editor closed: it
   refuses to start while `Temp/UnityLockfile` exists. Once the project is imported, a run takes
-  two to four minutes. Before the Unity runs it deletes their old reports and logs in
+  two to four minutes. In a fresh clone the first Unity run imports the whole project first,
+  which takes about seven minutes on a quiet machine and took more than half an hour while
+  another Unity build ran, so the CLI stops the first run after an hour and each other run
+  after half an hour; a run stopped so is reported as one that reached its timeout, which only
+  the CLI's own output (`artifacts/local/unity/<run>.cli.txt`) records, not the editor's log.
+  Before the Unity runs it deletes their old reports and logs in
   `artifacts/local/unity/`, Unity's build of the CoveredLot assemblies (in
   `Library/ScriptAssemblies/` and Bee's copies in `Library/Bee/artifacts/`) and any
   `Assembly-CSharp` DLL, so the first run compiles every CoveredLot assembly and everything
@@ -110,10 +115,12 @@ check:
 - the level catalogue (`LevelCatalogue.Load`): over the shipped texts on disk it gives the
   Example first, with the par the engine's solver finds, then Level 1 to N in the order
   `presentation.json` lists them, each with the slot and the par that file gives and the level
-  its own text loads to; over fakes it gives the first problem of each source that has one, in
-  a fixed order (the presentation file, the Example, then the listed levels), and it gives
-  every broken text as a problem without throwing, a broken text for every `LoadProblem` and
-  for every `LotTextProblem` the engine's reader returns among them;
+  its own text loads to; over fakes, a listed level's par is its entry's `peakPar` (not its
+  bays less `minFreeCapacity`, which every shipped level matches), and an Example whose par
+  takes all its bays and 5,256 nodes gets that par; and it gives the first problem of each
+  source that has one, in a fixed order (the presentation file, the Example, then the listed
+  levels), and every broken text as a problem without throwing, a broken text for every
+  `LoadProblem` and for every `LotTextProblem` the engine's reader returns among them;
 - the catalogue's copy: the problem screen's sentence and the exact development line of each
   kind of problem (`slot 0003: line 1, wrong header`), with words for every `LotTextProblem`
   and `LoadProblem` value the engine declares, all printable ASCII without a banned word;
@@ -125,10 +132,11 @@ check:
   gives it in Unity;
 - the compiled Core against the engine's Unity-bound API policy: no floating point and nothing
   the policy refuses, with each planted violation reported and the clean samples passing;
-- that no Core source opens an `unchecked` context, so the integer arithmetic it writes
-  stays overflow-checked; and that the compiled Core holds overflow-checked arithmetic
-  (`add.ovf` and the like) while no Core source opens a `checked` context of its own, which
-  shows that the build checked overflow;
+- that no Core source holds the word `unchecked`, so the integer arithmetic it writes stays
+  overflow-checked; and that the compiled Core holds overflow-checked arithmetic (`add.ovf`
+  and the like, not counting the `mul.ovf.un` the compiler writes for a `stackalloc`'s size in
+  any context) while no Core source holds the word `checked`, so none opens a checked context
+  of its own, which shows that the build checked overflow;
 - that no Core source names a culture-sensitive `StringComparison` value, which the policy
   lets through;
 - the game's three asmdefs and the three test asmdefs, property by property, no other asmdef
@@ -218,17 +226,17 @@ rather than UnityChecks alone. It checks, on Unity's own builds:
 - Core, the Client and the Editor: no async state machine;
 - Core: no catch block at all, no static field that can be reassigned, no floating point,
   nothing the Unity-bound API policy refuses, and no reference beyond netstandard and the two
-  engine DLLs; and overflow-checked arithmetic (`add.ovf` and the like), which shows that
-  Unity applied the `-checked+` of Core's `csc.rsp`, since no Core source opens a `checked`
-  context of its own;
+  engine DLLs; and overflow-checked arithmetic (`add.ovf` and the like, not counting a
+  `stackalloc`'s size check), which shows that Unity applied the `-checked+` of Core's
+  `csc.rsp`, since no Core source holds the word `checked`;
 - the Client and the Editor: none of the members that policy bans;
 - the Client: no member of the rules engine's types, no `ToString`, `Parse` or `TryParse` of a
   number type, no number type handed as the value to `StringBuilder`'s `Append` or `Insert` or
   to `TextWriter`'s or `Console`'s `Write` and `WriteLine`, no `String.Format`, no
   `StringBuilder.AppendFormat` or `AppendJoin` (with or without a provider), no
-  `FormattableStringFactory.Create`, no `String.Concat` and no `TextWriter` or `Console` `Write`
-  or `WriteLine` overload that takes an object (a composite format's arguments, a boxed value),
-  no `Convert.ToString`, and no `Color` or `Color32` constructed;
+  `FormattableStringFactory.Create`, no `String.Concat` overload, and no `TextWriter` or
+  `Console` `Write` or `WriteLine` overload, that takes an object (a composite format's
+  arguments, a boxed value), no `Convert.ToString`, and no `Color` or `Color32` constructed;
 - each run's report: at least one test, every test passed, none skipped, the run's own result
   Passed and no suite failed outside its tests (Unity records a failed one-time tear-down on its
   fixture alone, so the counts stay whole and the editor still exits 0), every test from that

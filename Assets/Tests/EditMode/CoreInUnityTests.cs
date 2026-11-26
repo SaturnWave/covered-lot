@@ -47,8 +47,12 @@ namespace CoveredLot.Tests.EditMode
             IReadOnlyList<CatalogueEntry> entries = EntriesOf(LevelCatalogue.Load(new ResourcesTexts()));
 
             var expected = new List<string> { "Example, no slot, par " + Number(ExamplePeakPar) };
-            expected.AddRange(listed.Select((level, position) =>
-                "Level " + Number(position + 1) + ", slot " + Number(level.Slot.Value) + ", par " + Number(ParOf(level))));
+            for (int position = 0; position < listed.Count; position++)
+            {
+                PresentationLevel level = listed[position];
+                expected.Add("Level " + Number(position + 1) + ", slot " + Number(level.Slot.Value) + ", par " + Number(ParOf(level)));
+            }
+
             Assert.That(listed.Count, Is.EqualTo(ListedLevelCount), "the levels presentation.json lists");
             Assert.That(entries.Select(Row).ToList(), Is.EqualTo(expected), "the catalogue's entries");
         }
@@ -62,7 +66,15 @@ namespace CoveredLot.Tests.EditMode
 
             Assert.That(entries.Count, Is.EqualTo(ListedLevelCount + 1), "the catalogue's entries: the Example and the listed levels");
             Assert.That(assets.Count, Is.EqualTo(entries.Count), "the asset texts to compare");
-            IReadOnlyList<string> differing = assets.Where((asset, index) => LotText.Write(entries[index].Level) != AssetText(asset)).ToList();
+            var differing = new List<string>();
+            for (int index = 0; index < assets.Count; index++)
+            {
+                if (LotText.Write(entries[index].Level) != AssetText(assets[index]))
+                {
+                    differing.Add(assets[index]);
+                }
+            }
+
             Assert.That(differing, Is.Empty, "LotText.Write gives another text than the asset for these entries");
         }
 
@@ -75,10 +87,15 @@ namespace CoveredLot.Tests.EditMode
 
             Assert.That(listed.Count, Is.EqualTo(ListedLevelCount), "the levels presentation.json lists");
             Assert.That(entries.Count, Is.EqualTo(listed.Count + 1), "the catalogue's entries: the Example and the listed levels");
-            IReadOnlyList<string> mismatched = listed
-                .Where((level, position) => LotText.Fingerprint(entries[position + 1].Level) != level.Fingerprint.Hex)
-                .Select(level => level.Level.Value)
-                .ToList();
+            var mismatched = new List<string>();
+            for (int position = 0; position < listed.Count; position++)
+            {
+                if (LotText.Fingerprint(entries[position + 1].Level) != listed[position].Fingerprint.Hex)
+                {
+                    mismatched.Add(listed[position].Level.Value);
+                }
+            }
+
             Assert.That(mismatched, Is.Empty, "these levels' fingerprints differ from presentation.json's");
         }
 

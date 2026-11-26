@@ -114,7 +114,7 @@ namespace CoveredLot.Core.Tests
         private static CurrentSources CoreSourcesNow()
         {
             var files = new List<CurrentSource>();
-            foreach (string path in RepositoryLayout.FilesWithExtension(CoreFolder, ".cs"))
+            foreach (string path in RepositoryLayout.FilesWithExtension(CoreFolder, FileExtension.CSharp))
             {
                 files.Add(new CurrentSource { RelativePath = RepositoryLayout.Relative(path), Content = File.ReadAllBytes(path).ToImmutableArray() });
             }

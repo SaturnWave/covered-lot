@@ -38,14 +38,14 @@ namespace CoveredLot.Core.Tests.Support
         /// included, whose extension is the given one in any letter case. MSBuild on Windows compiles Copy.CS as it
         /// compiles Copy.cs, so a guard that compared extensions exactly would miss a file the build takes.
         /// </summary>
-        public static IReadOnlyList<string> FilesWithExtension(string relativeFolder, string extension) => Directory
+        public static IReadOnlyList<string> FilesWithExtension(string relativeFolder, FileExtension extension) => Directory
             .EnumerateFiles(FullPath(relativeFolder), "*", SearchOption.AllDirectories)
             .Where(path => HasExtension(path, extension))
             .ToList();
 
-        /// <summary>Whether the path ends in the extension (".cs", with its dot), in any letter case.</summary>
-        public static bool HasExtension(string path, string extension) =>
-            string.Equals(Path.GetExtension(path), extension, StringComparison.OrdinalIgnoreCase);
+        /// <summary>Whether the path ends in the extension, in any letter case.</summary>
+        public static bool HasExtension(string path, FileExtension extension) =>
+            string.Equals(Path.GetExtension(path), extension.WithDot, StringComparison.OrdinalIgnoreCase);
 
         private static IReadOnlyList<string> ListFilesKnownToGit()
         {
@@ -96,5 +96,25 @@ namespace CoveredLot.Core.Tests.Support
             throw new InvalidOperationException(
                 "No " + RootMarker + " above " + AppContext.BaseDirectory + "; run the tests from inside the repository.");
         }
+    }
+
+    /// <summary>
+    /// A file extension the guards look for, with its dot (".cs"). A type of its own, so that an extension cannot take the
+    /// place of the path or the folder it is looked for in.
+    /// </summary>
+    internal readonly struct FileExtension
+    {
+        private FileExtension(string withDot) => WithDot = withDot;
+
+        public static FileExtension CSharp { get; } = new(".cs");
+
+        public static FileExtension Asmdef { get; } = new(".asmdef");
+
+        public static FileExtension Asmref { get; } = new(".asmref");
+
+        public static FileExtension Dll { get; } = new(".dll");
+
+        /// <summary>The extension as Path.GetExtension gives it, dot included.</summary>
+        public string WithDot { get; }
     }
 }
