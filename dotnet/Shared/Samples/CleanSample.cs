@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
 using System.Linq;
 
 namespace CoveredLot.Shared.Samples
@@ -41,11 +40,14 @@ namespace CoveredLot.Shared.Samples
             }
         }
 
-        /// <summary>A using statement compiles to try/finally, which is no catch.</summary>
-        public static int FirstByte(byte[] bytes)
+        /// <summary>
+        /// A using statement compiles to try/finally, which is no catch. It disposes an enumerator, which the Unity-bound
+        /// API policy allows, where a stream it refuses would not be clean.
+        /// </summary>
+        public static int FirstPrime()
         {
-            using var stream = new MemoryStream(bytes);
-            return stream.ReadByte();
+            using IEnumerator<int> primes = ((IEnumerable<int>)Primes).GetEnumerator();
+            return primes.MoveNext() ? primes.Current : 0;
         }
 
         /// <summary>A lambda that captures nothing: the compiler caches it in a static field of its own &lt;&gt;c type.</summary>
