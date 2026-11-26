@@ -8,12 +8,32 @@ namespace CoveredLot.Shared
     /// The platform APIs that Unity-bound code may use, ported from the engine's policy for its own Unity-bound assemblies
     /// (SaturnWave/puzzle-engine, tests/PuzzleCore.Tests/Support/UnityBoundApiPolicy.cs). The rule it serves: the same
     /// actions give the same results on every device and on .NET, Mono and IL2CPP alike. It is an ALLOWLIST: a type that
-    /// is not listed is rejected, so a new way to read the clock, draw randomness, depend on the device culture, platform
-    /// or time zone, or do floating-point math cannot slip in unnoticed. Within allowed types, member bans remove the
-    /// culture-, platform- and process-dependent members. Adding a type or lifting a ban is a reviewed change with a
-    /// reason in the comment next to it. Members the compiler synthesizes for records (ToString, PrintMembers, Equals,
-    /// GetHashCode...) are exempt, on the rule that no result is ever built from their output.
+    /// is not listed is rejected, so a new type that reads the clock, draws randomness, depends on the device culture,
+    /// platform or time zone, or does floating-point math cannot slip in unnoticed. Within allowed types, member bans
+    /// remove the culture-, platform- and process-dependent members they name; the remarks list the uses of allowed
+    /// members that they do not see. Adding a type or lifting a ban is a reviewed change with a reason in the comment
+    /// next to it. Members the compiler synthesizes for records (ToString, PrintMembers, Equals, GetHashCode...) are
+    /// exempt, on the rule that no result is ever built from their output.
     /// </summary>
+    /// <remarks>
+    /// Known gaps, which the engine's policy has too. Each of these passes this policy and <see cref="MemberBansPolicy"/>:
+    /// <list type="bullet">
+    /// <item><description>A number formatted through System.Object.ToString: boxed, held in a Nullable, a ValueTuple or a
+    /// KeyValuePair, or passed as a generic T. The call then names no number type.</description></item>
+    /// <item><description>A null IFormatProvider, passed to an overload that takes one.</description></item>
+    /// <item><description>A culture-sensitive StringComparison, passed to a string member that takes one (Equals, Compare,
+    /// StartsWith, EndsWith, IndexOf, LastIndexOf and others): the walk does not read the constant. For Core, the hygiene
+    /// tests refuse the four culture-sensitive names in its sources instead.</description></item>
+    /// <item><description>BinarySearch over text without a comparer (List&lt;T&gt;, Array), and CompareTo called through
+    /// IComparable or IComparable&lt;T&gt;.</description></item>
+    /// <item><description>HashSet&lt;T&gt;.CopyTo, which copies the elements in hash order.</description></item>
+    /// <item><description>A dictionary or set handed on as an IEnumerable&lt;T&gt; through a helper's return value or an
+    /// interface-typed local (see <see cref="AssemblyScanner"/>).</description></item>
+    /// </list>
+    /// One more passes <see cref="MemberBansPolicy"/> only: System.Collections.Comparer.Default and DefaultInvariant, which
+    /// order text by the device culture or the platform's collation tables. The bans name get_Default and
+    /// get_DefaultInvariant, but both are static fields, so the bans never match; the allowlist refuses the type.
+    /// </remarks>
     internal sealed class UnityBoundApiPolicy : IPlatformApiPolicy
     {
         private const string Culture = "depends on the device culture; pass CultureInfo.InvariantCulture or use an ordinal overload";
@@ -57,9 +77,13 @@ namespace CoveredLot.Shared
             }
         }
 
+        /// <summary>Every banned member as Type::Member (the type without generic arguments), each once; the self-tests plant a use of each.</summary>
+        public IReadOnlyList<string> BannedMembers => _bans.Select(ban => ban.TypeName + "::" + ban.MemberName).Distinct(StringComparer.Ordinal).ToList();
+
         /// <summary>
-        /// The member bans alone, without the allowlist: culture-dependent text and text order, the platform newline,
-        /// randomized hashing, thread identity, unordered enumeration and unstable sorts. <see cref="MemberBansPolicy"/>
+        /// The member bans alone, without the allowlist: the members DefaultBans names for culture-dependent text and text
+        /// order, the platform newline, randomized hashing, Environment.CurrentManagedThreadId, enumeration in hash order
+        /// and unstable sorts, and the hash-order rules of <see cref="UnorderedSequences"/>. <see cref="MemberBansPolicy"/>
         /// applies them to code that may use every platform type.
         /// </summary>
         public IEnumerable<string> BannedMemberUses(MemberUse use, CallerContext caller)
@@ -149,7 +173,8 @@ namespace CoveredLot.Shared
             // GetEnumerator read Environment.CurrentManagedThreadId; a ban below allows only that.
             yield return new OnlyMembers("System.Environment", ["get_CurrentManagedThreadId"]);
 
-            // Reflection is limited to what records and typeof comparisons compile to.
+            // Of System.Type, only what records and typeof comparisons compile to. Object.GetType stays allowed, as every
+            // member of System.Object is, and so are Object's members on the Type it returns (ToString gives its name).
             yield return new OnlyMembers("System.Type", ["GetTypeFromHandle", "op_Equality", "op_Inequality"]);
             // EnsureSufficientExecutionStack is what record ToString/PrintMembers compile to.
             yield return new OnlyMembers("System.Runtime.CompilerServices.RuntimeHelpers", ["InitializeArray", "GetSubArray", "EnsureSufficientExecutionStack"]);
@@ -192,6 +217,8 @@ namespace CoveredLot.Shared
         {
             var bans = new List<MemberBan>();
 
+            // An overload that takes an IFormatProvider passes whatever provider it is given, a null one included, which
+            // formats with the device culture (see the remarks).
             foreach (string type in IntegerTypes)
             {
                 bans.Add(new MemberBan { TypeName = type, MemberName = "ToString", Reason = Culture,
@@ -206,6 +233,8 @@ namespace CoveredLot.Shared
                 AppliesTo = WithParameters(parameters => parameters.Count == 0) });
             bans.Add(new MemberBan { TypeName = "System.String", MemberName = "ToLower", Reason = Culture,
                 AppliesTo = WithParameters(parameters => parameters.Count == 0) });
+            // Compare and the four searches let through an overload with a StringComparison parameter, whatever value it is
+            // given: the walk does not read the constant, so StringComparison.CurrentCulture passes too (see the remarks).
             bans.Add(new MemberBan { TypeName = "System.String", MemberName = "Compare", Reason = Culture,
                 AppliesTo = WithParameters(parameters => !parameters.Contains("System.StringComparison")) });
             bans.Add(new MemberBan { TypeName = "System.String", MemberName = "CompareTo", Reason = Culture, AppliesTo = _ => true });
@@ -215,6 +244,7 @@ namespace CoveredLot.Shared
                     AppliesTo = WithParameters(parameters => parameters.Count > 0 && parameters[0] == "System.String" && !parameters.Contains("System.StringComparison")) });
             }
 
+            // Format and AppendFormat let through an overload that takes a provider first, a null provider included.
             bans.Add(new MemberBan { TypeName = "System.String", MemberName = "Format", Reason = Culture,
                 AppliesTo = WithParameters(parameters => parameters.Count == 0 || parameters[0] != "System.IFormatProvider") });
             // Concat<T> and Join<T> call T.ToString(); with T = string that is the text itself.
@@ -255,6 +285,9 @@ namespace CoveredLot.Shared
                 bans.Add(new MemberBan { TypeName = "System.StringComparer", MemberName = comparer, Reason = LinguisticOrder, AppliesTo = _ => true });
             }
 
+            // These two bans, the engine's, name property getters, but Comparer.Default and DefaultInvariant are static fields
+            // (IL reads them with ldsfld), so neither ban ever matches. The allowlist refuses the type, which keeps both out
+            // of Unity-bound code; the member bans alone let them through (see the remarks).
             bans.Add(new MemberBan { TypeName = "System.Collections.Comparer", MemberName = "get_Default", Reason = LinguisticOrder, AppliesTo = _ => true });
             bans.Add(new MemberBan { TypeName = "System.Collections.Comparer", MemberName = "get_DefaultInvariant", Reason = LinguisticOrder, AppliesTo = _ => true });
             bans.Add(new MemberBan { TypeName = "System.Collections.Generic.Comparer`1", MemberName = "get_Default", Reason = LinguisticOrder,

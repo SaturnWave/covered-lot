@@ -49,13 +49,15 @@ namespace CoveredLot.Shared
         /// <summary>The type arguments of a generic instantiation (String and Int32 of Dictionary`2&lt;String,Int32&gt;); empty otherwise.</summary>
         public ImmutableArray<TypeShape> TypeArguments { get; init; } = ImmutableArray<TypeShape>.Empty;
 
-        /// <summary>The index of a generic parameter placeholder: 1 for "!1" (the type's) or "!!1" (the method's); null for any other type.</summary>
-        public int? PlaceholderIndex(bool ofMethod)
-        {
-            string prefix = ofMethod ? "!!" : "!";
-            bool isPlaceholder = Display.StartsWith(prefix, StringComparison.Ordinal) && (ofMethod || !Display.StartsWith("!!", StringComparison.Ordinal));
-            return isPlaceholder && int.TryParse(Display.AsSpan(prefix.Length), NumberStyles.None, CultureInfo.InvariantCulture, out int index) ? index : null;
-        }
+        /// <summary>The index of a placeholder for the method's own generic parameter: 1 for "!!1"; null for any other type.</summary>
+        public int? MethodParameterIndex => IndexAfter("!!");
+
+        /// <summary>The index of a placeholder for the declaring type's generic parameter: 1 for "!1"; null for any other type, "!!1" included.</summary>
+        public int? TypeParameterIndex => Display.StartsWith("!!", StringComparison.Ordinal) ? null : IndexAfter("!");
+
+        private int? IndexAfter(string prefix) =>
+            Display.StartsWith(prefix, StringComparison.Ordinal)
+            && int.TryParse(Display.AsSpan(prefix.Length), NumberStyles.None, CultureInfo.InvariantCulture, out int index) ? index : null;
     }
 
     /// <summary>
@@ -80,12 +82,12 @@ namespace CoveredLot.Shared
         /// <summary>The type with the declaring type's (!n) and the method's (!!n) generic parameters replaced by their arguments, where known.</summary>
         public TypeShape Resolve(TypeShape type)
         {
-            if (type.PlaceholderIndex(ofMethod: true) is int methodIndex)
+            if (type.MethodParameterIndex is int methodIndex)
             {
                 return methodIndex < MethodTypeArguments.Count ? MethodTypeArguments[methodIndex] : type;
             }
 
-            if (type.PlaceholderIndex(ofMethod: false) is int typeIndex)
+            if (type.TypeParameterIndex is int typeIndex)
             {
                 return typeIndex < DeclaringType.TypeArguments.Length ? DeclaringType.TypeArguments[typeIndex] : type;
             }
@@ -113,14 +115,31 @@ namespace CoveredLot.Shared
     }
 
     /// <summary>
+    /// One external type that a type definition names in its declarations (see
+    /// <see cref="AssemblyScanner.DeclaredExternalTypes"/>), for example System.Collections.Generic.IReadOnlyList`1.
+    /// </summary>
+    internal sealed record DeclaredTypeUse
+    {
+        /// <summary>The type definition, nested types with their full name, for example "CoveredLot.Core.X+Y".</summary>
+        public required string DeclaringType { get; init; }
+
+        /// <summary>The external type's name, generic arguments stripped.</summary>
+        public required string ExternalType { get; init; }
+    }
+
+    /// <summary>
     /// Reads a compiled assembly's metadata and IL without loading it, to prove rules the compiler cannot enforce.
-    /// Everything is checked on the compiled output, so a rule cannot be dodged with var, generics or a helper
-    /// method. A port of the engine's AssemblyInspection (SaturnWave/puzzle-engine,
-    /// tests/PuzzleCore.Tests/Support/AssemblyInspection.cs): its catch regions, type, member and assembly references,
-    /// floating-point scan and platform-API policy walk, with the signature shapes and the stack-flow walk by which the
-    /// policies judge each call. The engine's list of type mentions, which only its bot guard uses, is left out. Three
-    /// scans of this repository's own are added: every catch block (Core has none at all), async state machines, and
-    /// static fields that can be reassigned.
+    /// Everything is checked on the compiled output, so var hides nothing, and a helper method hides no call it makes:
+    /// every method body is scanned, whoever calls it. What a rule sees of a value, though, is the static type the IL
+    /// walk knows (see Flow):
+    /// an integer formatted as a generic T or after boxing reaches System.Object.ToString, and a set handed on as an
+    /// IEnumerable&lt;T&gt; through a helper's return value or an interface-typed local is no longer seen as a set. A
+    /// port of the engine's AssemblyInspection (SaturnWave/puzzle-engine, tests/PuzzleCore.Tests/Support/AssemblyInspection.cs):
+    /// its catch regions, type, member and assembly references, floating-point scan and platform-API policy walk, with the
+    /// signature shapes and the stack-flow walk by which the policies judge each call. The engine's list of type mentions,
+    /// which only its bot guard uses, is left out. Four scans of this repository's own are added: every catch block
+    /// (Core has none at all), async state machines, static fields that can be reassigned, and the external types each
+    /// type declares.
     /// </summary>
     internal sealed class AssemblyScanner : IDisposable
     {
@@ -370,6 +389,39 @@ namespace CoveredLot.Shared
             return found;
         }
 
+        /// <summary>
+        /// The external types each type definition names in its declarations: its base type and interfaces, the types of
+        /// its fields and properties, and the parameter, return and local types of its methods, generic arguments
+        /// included. Attributes are not included, and neither are the sibling assemblies' types. The policy walk judges
+        /// what method bodies name at each instruction; a refused type that appears only in such a declaration reaches
+        /// <see cref="ApiPolicyViolations"/> once, unlocated, through the type reference table, and this shows which
+        /// type named it.
+        /// </summary>
+        public IReadOnlyList<DeclaredTypeUse> DeclaredExternalTypes()
+        {
+            var found = new List<DeclaredTypeUse>();
+            foreach (TypeDefinitionHandle typeHandle in _reader.TypeDefinitions)
+            {
+                TypeDefinition type = _reader.GetTypeDefinition(typeHandle);
+                IEnumerable<TypeShape> supertypes = type.GetInterfaceImplementations()
+                    .Select(implementation => ShapeOf(_reader.GetInterfaceImplementation(implementation).Interface))
+                    .Concat(type.BaseType.IsNil ? Array.Empty<TypeShape>() : new[] { ShapeOf(type.BaseType) });
+                IEnumerable<TypeShape> fields = type.GetFields()
+                    .Select(field => _reader.GetFieldDefinition(field).DecodeSignature(_shapes, null));
+                IEnumerable<TypeShape> properties = type.GetProperties()
+                    .SelectMany(property => SignatureTypes(_reader.GetPropertyDefinition(property).DecodeSignature(_shapes, null)));
+                IEnumerable<TypeShape> methods = type.GetMethods()
+                    .SelectMany(method => SignatureTypes(_reader.GetMethodDefinition(method).DecodeSignature(_shapes, null)).Concat(LocalTypes(method)));
+                string typeName = FullName(typeHandle);
+                found.AddRange(supertypes.Concat(fields).Concat(properties).Concat(methods)
+                    .SelectMany(shape => shape.ExternalTypes)
+                    .Distinct(StringComparer.Ordinal)
+                    .Select(external => new DeclaredTypeUse { DeclaringType = typeName, ExternalType = external }));
+            }
+
+            return found;
+        }
+
         private IEnumerable<Violation> PolicyViolationsAt(MethodDefinitionHandle method, FlowStep step, CallerContext caller, IPlatformApiPolicy policy)
         {
             Instruction instruction = step.Instruction;
@@ -525,6 +577,9 @@ namespace CoveredLot.Shared
 
         private static bool UsesFloatingPoint(MethodSignature<TypeShape> signature) =>
             signature.ReturnType.UsesFloatingPoint || signature.ParameterTypes.Any(parameter => parameter.UsesFloatingPoint);
+
+        private static IEnumerable<TypeShape> SignatureTypes(MethodSignature<TypeShape> signature) =>
+            signature.ParameterTypes.Prepend(signature.ReturnType);
 
         /// <summary>The external (referenced) types an IL operand mentions, including generic arguments.</summary>
         private IEnumerable<string> ExternalTypesOf(EntityHandle operand)
@@ -771,8 +826,12 @@ namespace CoveredLot.Shared
             }
         }
 
-        /// <summary>The argument or local an ldarg, ldloc, starg or stloc names (implied by ldarg.0...ldloc.3); -1 for any other instruction.</summary>
-        private static int VariableIndex(OpCode opCode, byte[] il, int operandStart)
+        /// <summary>
+        /// The argument or local that ldarg.0-ldarg.3 or ldloc.0-ldloc.3 imply, or that an ldarg, ldarga, starg, ldloc,
+        /// ldloca or stloc names in its operand; null for any other instruction. stloc.0-stloc.3 are not decoded: the walk
+        /// reads the types of loaded values only.
+        /// </summary>
+        private static int? VariableIndex(OpCode opCode, byte[] il, int operandStart)
         {
             int implied = Array.IndexOf(ImpliedVariableOpCodes, opCode.Value);
             if (implied >= 0)
@@ -784,13 +843,13 @@ namespace CoveredLot.Shared
             {
                 OperandType.ShortInlineVar => il[operandStart],
                 OperandType.InlineVar => BinaryPrimitives.ReadUInt16LittleEndian(il.AsSpan(operandStart)),
-                _ => -1,
+                _ => null,
             };
         }
 
         /// <summary>
-        /// The offsets a branch or switch may jump to, each counted from the instruction after it; empty for any other
-        /// instruction.
+        /// The IL offsets a branch or switch may jump to (its operands count from the next instruction, whose offset this
+        /// works out with OperandSize); empty for any other instruction.
         /// </summary>
         private static ImmutableArray<int> BranchTargets(OperandType operandType, byte[] il, int operandStart)
         {
@@ -1000,7 +1059,7 @@ namespace CoveredLot.Shared
             if (loadsArgument || loadsLocal)
             {
                 IReadOnlyList<TypeShape> declared = loadsArgument ? variables.Arguments : variables.Locals;
-                return instruction.Variable >= 0 && instruction.Variable < declared.Count ? declared[instruction.Variable] : null;
+                return instruction.Variable is int index && index < declared.Count ? declared[index] : null;
             }
 
             if (opCode == OpCodes.Ldfld || opCode == OpCodes.Ldsfld)
@@ -1079,8 +1138,8 @@ namespace CoveredLot.Shared
 
         private readonly record struct Instruction(int Offset, OpCode OpCode, EntityHandle Operand)
         {
-            /// <summary>The argument or local index of ldarg/ldloc/starg/stloc and their short forms; -1 otherwise.</summary>
-            public int Variable { get; init; }
+            /// <summary>The argument or local index the instruction names or implies (see VariableIndex); null for any other instruction.</summary>
+            public int? Variable { get; init; }
 
             /// <summary>Where a branch or switch may jump; empty otherwise.</summary>
             public ImmutableArray<int> Targets { get; init; }

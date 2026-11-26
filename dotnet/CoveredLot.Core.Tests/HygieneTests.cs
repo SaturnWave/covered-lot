@@ -22,6 +22,12 @@ namespace CoveredLot.Core.Tests
     /// can wrap only inside an unchecked context, and no Core source may open one. The IL cannot show this: the
     /// compiler's own lowering of a foreach over an array, of a switch over an enum that starts at 1 or of an index
     /// from the end emits a plain add or sub that cannot overflow.
+    ///
+    /// Culture-sensitive string comparison is checked on the sources too. The API policy (ApiPolicyTests) lets a string
+    /// member through whenever it takes a StringComparison, whatever value it is given, and the analyzers flag such a
+    /// value only for Equals and Compare, and only in the .NET build. So no Core source may name StringComparison's
+    /// CurrentCulture, CurrentCultureIgnoreCase, InvariantCulture or InvariantCultureIgnoreCase. Like the unchecked rule,
+    /// this reads text: it matches in comments and strings as well, and a value cast from an integer gets past it.
     /// </summary>
     public sealed class HygieneTests
     {
@@ -40,6 +46,11 @@ namespace CoveredLot.Core.Tests
         /// from code takes a C# lexer, and Core's comments and copy can say it another way.
         /// </summary>
         private static readonly Regex UncheckedKeyword = new(@"\bunchecked\b", RegexOptions.CultureInvariant);
+
+        /// <summary>A StringComparison value that compares by a culture's rules, qualified or not by its namespace.</summary>
+        private static readonly Regex CultureSensitiveComparison = new(
+            @"\bStringComparison\s*\.\s*(CurrentCulture|CurrentCultureIgnoreCase|InvariantCulture|InvariantCultureIgnoreCase)\b",
+            RegexOptions.CultureInvariant);
 
         [Fact]
         public void Core_has_no_generic_bare_filtered_or_empty_catch_block()
@@ -96,11 +107,43 @@ namespace CoveredLot.Core.Tests
         {
             IReadOnlyList<string> sources = CoreSources();
 
-            IReadOnlyList<string> uncheckedLines = sources.SelectMany(UncheckedLines).ToList();
+            IReadOnlyList<string> uncheckedLines = sources.SelectMany(source => LinesMatching(source, UncheckedKeyword)).ToList();
 
             Assert.NotEmpty(sources);
             Assert.True(uncheckedLines.Count == 0,
                 "Core keeps its overflow checks; these lines name unchecked:\n" + string.Join("\n", uncheckedLines));
+        }
+
+        [Fact]
+        public void No_Core_source_names_a_culture_sensitive_string_comparison()
+        {
+            IReadOnlyList<string> sources = CoreSources();
+
+            IReadOnlyList<string> comparisonLines = sources.SelectMany(source => LinesMatching(source, CultureSensitiveComparison)).ToList();
+
+            Assert.NotEmpty(sources);
+            Assert.True(comparisonLines.Count == 0,
+                "Core compares text ordinally; these lines name a culture-sensitive StringComparison:\n" + string.Join("\n", comparisonLines));
+        }
+
+        [Theory]
+        [InlineData("bool done = text.EndsWith(\"xy\", StringComparison.InvariantCulture);")]
+        [InlineData("int at = text.IndexOf(\"in\", StringComparison.CurrentCultureIgnoreCase);")]
+        [InlineData("bool same = string.Equals(first, second, System.StringComparison.CurrentCulture);")]
+        [InlineData("int order = string.Compare(first, second, StringComparison . InvariantCultureIgnoreCase);")]
+        public void The_source_scan_reports_each_planted_culture_sensitive_comparison(string line)
+        {
+            Assert.Matches(CultureSensitiveComparison, line);
+        }
+
+        [Theory]
+        [InlineData("bool done = text.EndsWith(\"xy\", StringComparison.Ordinal);")]
+        [InlineData("bool same = string.Equals(first, second, StringComparison.OrdinalIgnoreCase);")]
+        [InlineData("var comparer = StringComparer.InvariantCulture;")]
+        [InlineData("var mode = LevelStringComparison.CurrentCulture;")]
+        public void The_source_scan_passes_ordinal_comparisons_and_other_names(string line)
+        {
+            Assert.DoesNotMatch(CultureSensitiveComparison, line);
         }
 
         [Theory]
@@ -213,10 +256,10 @@ namespace CoveredLot.Core.Tests
             .Where(path => string.Equals(Path.GetExtension(path), ".cs", StringComparison.Ordinal))
             .ToList();
 
-        /// <summary>Each line of the source that names unchecked, as path:line.</summary>
-        private static IEnumerable<string> UncheckedLines(string source) => File.ReadAllLines(source)
+        /// <summary>Each line of the source that the pattern matches, as path:line.</summary>
+        private static IEnumerable<string> LinesMatching(string source, Regex pattern) => File.ReadAllLines(source)
             .Select((text, index) => (Text: text, Number: index + 1))
-            .Where(line => UncheckedKeyword.IsMatch(line.Text))
+            .Where(line => pattern.IsMatch(line.Text))
             .Select(line => RepositoryLayout.Relative(source) + ":" + line.Number.ToString(CultureInfo.InvariantCulture));
 
         /// <summary>Whether a location or type name lies in the type or in a type nested in it (a state machine, a closure).</summary>

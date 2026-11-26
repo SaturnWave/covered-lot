@@ -57,9 +57,11 @@ check:
   async, no static field that can be reassigned, and no reference beyond what its asmdef
   gives it in Unity;
 - the compiled Core against the engine's Unity-bound API policy: no floating point and nothing
-  the policy refuses, with the scans proved on the engine's planted samples;
+  the policy refuses, with each planted violation reported and the clean samples passing;
 - that no Core source opens an `unchecked` context, so the integer arithmetic it writes
   stays overflow-checked;
+- that no Core source names a culture-sensitive `StringComparison` value, which the policy
+  lets through;
 - the asmdef and `csc.rsp` rules, and that Unity and .NET compile the same files into Core;
 - `Assets/Generated` against its checksums and record, and every shipped level text.
 
