@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using CoveredLot.Core.Tests.Support;
 using CoveredLot.Shared;
 using Xunit;
@@ -22,8 +21,12 @@ namespace CoveredLot.Core.Tests
     /// assembly allows unsafe code, and every assembly of both folders carries its own csc.rsp, because a csc.rsp at the
     /// Assets root would apply to every package as well. Unity and the .NET build compile the same files into Core: the
     /// .NET build takes every .cs under Assets/CoveredLot/Core, so no other asmdef or asmref may move files in or out of
-    /// Core in Unity, and no source may sit where Unity does not import it. And every C# source under Assets lies in the
-    /// folder of one of the six asmdefs, so Unity builds no Assembly-CSharp from a stray script.
+    /// Core in Unity, and no source may sit where Unity does not import it. Every C# source under Assets lies in the
+    /// folder of one of the six asmdefs, and no asmref sits anywhere under Assets, so Unity compiles each source into one
+    /// of the six assemblies: none into Assembly-CSharp, and none into a package's assembly. Nor does Unity find code
+    /// anywhere else: the Packages folder holds only the manifest and its lock file, so no embedded package is compiled,
+    /// and no DLL lies under Assets but the two engine DLLs. Every walk compares extensions in any letter case, as MSBuild
+    /// on Windows takes Copy.CS for a C# source.
     /// </summary>
     public sealed class AsmdefGuardTests
     {
@@ -37,12 +40,16 @@ namespace CoveredLot.Core.Tests
         private const string EditModeAsmdef = TestsFolder + "/EditMode/CoveredLot.Tests.EditMode.asmdef";
         private const string PlayModeAsmdef = TestsFolder + "/PlayMode/CoveredLot.Tests.PlayMode.asmdef";
         private const string CoreAssembly = "CoveredLot.Core";
+        private const string PackagesFolder = "Packages";
 
         /// <summary>The assembly every netstandard2.1 library references; Unity gives it to every assembly as well.</summary>
         private const string NetStandard = "netstandard";
 
-        /// <summary>The guid line of a Unity .meta file.</summary>
-        private static readonly Regex MetaGuid = new(@"^guid: (?<guid>[0-9a-f]{32})\r?$", RegexOptions.CultureInvariant | RegexOptions.Multiline);
+        /// <summary>The only entries of the Packages folder: the manifest Unity resolves packages from, and its lock file.</summary>
+        private static readonly string[] PackagesFolderEntries = { PackagesFolder + "/manifest.json", PackagesFolder + "/packages-lock.json" };
+
+        /// <summary>The only DLLs under Assets: the engine's two, which tools/sync-engine.sh stages and Assets/Generated's checksums pin.</summary>
+        private static readonly string[] EngineDlls = { "Assets/Generated/PuzzleCore/PuzzleCore.dll", "Assets/Generated/PuzzleCore/PuzzleCore.Jam.dll" };
 
         /// <summary>Core's asmdef, property by property, each value in compact JSON.</summary>
         private static readonly IReadOnlyDictionary<string, string> ExpectedCoreAsmdef = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -206,7 +213,7 @@ namespace CoveredLot.Core.Tests
         [Fact]
         public void The_CoveredLot_folder_holds_the_Core_Client_and_Editor_asmdefs_only()
         {
-            IReadOnlyList<string> asmdefs = Sorted(FilesWithExtension(CoveredLotFolder, ".asmdef").Select(path => RepositoryLayout.Relative(path)));
+            IReadOnlyList<string> asmdefs = Sorted(RepositoryLayout.FilesWithExtension(CoveredLotFolder, ".asmdef").Select(path => RepositoryLayout.Relative(path)));
 
             Assert.Equal(Sorted(new[] { CoreAsmdef, ClientAsmdef, EditorAsmdef }), asmdefs);
         }
@@ -214,7 +221,7 @@ namespace CoveredLot.Core.Tests
         [Fact]
         public void The_Tests_folder_holds_the_Support_EditMode_and_PlayMode_asmdefs_only()
         {
-            IReadOnlyList<string> asmdefs = Sorted(FilesWithExtension(TestsFolder, ".asmdef").Select(path => RepositoryLayout.Relative(path)));
+            IReadOnlyList<string> asmdefs = Sorted(RepositoryLayout.FilesWithExtension(TestsFolder, ".asmdef").Select(path => RepositoryLayout.Relative(path)));
 
             Assert.Equal(Sorted(new[] { SupportAsmdef, EditModeAsmdef, PlayModeAsmdef }), asmdefs);
         }
@@ -229,7 +236,7 @@ namespace CoveredLot.Core.Tests
             IReadOnlyList<string> folders = new[] { CoreAsmdef, ClientAsmdef, EditorAsmdef, SupportAsmdef, EditModeAsmdef, PlayModeAsmdef }
                 .Select(asmdef => asmdef[..(asmdef.LastIndexOf('/') + 1)])
                 .ToList();
-            IReadOnlyList<string> sources = FilesWithExtension("Assets", ".cs").Select(path => RepositoryLayout.Relative(path)).ToList();
+            IReadOnlyList<string> sources = RepositoryLayout.FilesWithExtension("Assets", ".cs").Select(path => RepositoryLayout.Relative(path)).ToList();
 
             IReadOnlyList<string> outside = sources.Where(source => !folders.Any(folder => source.StartsWith(folder, StringComparison.Ordinal))).ToList();
 
@@ -261,7 +268,7 @@ namespace CoveredLot.Core.Tests
         [Fact]
         public void No_asmdef_under_Assets_allows_unsafe_code()
         {
-            IReadOnlyList<string> asmdefs = FilesWithExtension("Assets", ".asmdef");
+            IReadOnlyList<string> asmdefs = RepositoryLayout.FilesWithExtension("Assets", ".asmdef");
             var unsafeOnes = new List<string>();
             foreach (string asmdef in asmdefs)
             {
@@ -279,31 +286,57 @@ namespace CoveredLot.Core.Tests
         [Fact]
         public void The_Core_folder_holds_the_Core_asmdef_and_no_other_asmdef_or_asmref()
         {
-            IEnumerable<string> definitions = FilesWithExtension(CoreFolder, ".asmdef")
-                .Concat(FilesWithExtension(CoreFolder, ".asmref"))
+            IEnumerable<string> definitions = RepositoryLayout.FilesWithExtension(CoreFolder, ".asmdef")
+                .Concat(RepositoryLayout.FilesWithExtension(CoreFolder, ".asmref"))
                 .Select(path => RepositoryLayout.Relative(path));
 
             Assert.Equal(new[] { CoreAsmdef }, definitions);
         }
 
-        /// <summary>An asmref adds its folder's files to the assembly it names, in Unity only.</summary>
+        /// <summary>
+        /// Unity compiles the folder of an asmref, and the folders below it, into the assembly the asmref names, a package's
+        /// included, and not into the assembly of the asmdef above it. A source there still lies in an asmdef's folder, but
+        /// escapes that assembly's csc.rsp and every scan of it; an asmref that names Core adds files to Core in Unity only.
+        /// The design has no asmref.
+        /// </summary>
         [Fact]
-        public void No_asmref_under_Assets_adds_files_to_Core()
+        public void No_asmref_lies_under_Assets()
         {
-            ISet<string> namesOfCore = WaysToNameCore();
+            IReadOnlyList<string> asmrefs = RepositoryLayout.FilesWithExtension("Assets", ".asmref").Select(path => RepositoryLayout.Relative(path)).ToList();
 
-            IReadOnlyList<string> offenders = FilesWithExtension("Assets", ".asmref")
-                .Where(asmref => namesOfCore.Contains(ReferenceOf(asmref)))
-                .Select(path => RepositoryLayout.Relative(path))
-                .ToList();
+            Assert.True(asmrefs.Count == 0,
+                "Unity compiles the folder of each of these into the assembly it names, not into the assembly of the asmdef above it: " + string.Join(", ", asmrefs));
+        }
 
-            Assert.True(offenders.Count == 0, "these asmrefs add their files to " + CoreAssembly + " in Unity only: " + string.Join(", ", offenders));
+        /// <summary>
+        /// Unity compiles a package folder under Packages (an embedded package) with no entry in the manifest, into
+        /// assemblies of its own that neither our csc.rsp nor any scan reaches; the game takes its packages from the manifest.
+        /// </summary>
+        [Fact]
+        public void The_Packages_folder_holds_only_the_manifest_and_its_lock_file()
+        {
+            IReadOnlyList<string> entries = Sorted(Directory.EnumerateFileSystemEntries(RepositoryLayout.FullPath(PackagesFolder))
+                .Select(path => RepositoryLayout.Relative(path)));
+
+            Assert.Equal(Sorted(PackagesFolderEntries), entries);
+        }
+
+        /// <summary>
+        /// Unity loads every DLL under Assets as a plug-in that any assembly may be given, and no check reads its code; so no
+        /// build output may land there, and the engine's two DLLs are the only ones.
+        /// </summary>
+        [Fact]
+        public void No_dll_lies_under_Assets_but_the_two_engine_dlls()
+        {
+            IReadOnlyList<string> dlls = Sorted(RepositoryLayout.FilesWithExtension("Assets", ".dll").Select(path => RepositoryLayout.Relative(path)));
+
+            Assert.Equal(Sorted(EngineDlls), dlls);
         }
 
         [Fact]
         public void No_Core_source_lies_where_Unity_does_not_import_it()
         {
-            IReadOnlyList<string> sources = FilesWithExtension(CoreFolder, ".cs").Select(path => RepositoryLayout.Relative(path)).ToList();
+            IReadOnlyList<string> sources = RepositoryLayout.FilesWithExtension(CoreFolder, ".cs").Select(path => RepositoryLayout.Relative(path)).ToList();
 
             IReadOnlyList<string> hidden = sources.Where(UnityAssets.IsHidden).ToList();
 
@@ -314,7 +347,7 @@ namespace CoveredLot.Core.Tests
         [Fact]
         public void Every_asmdef_folder_of_the_game_and_its_tests_has_a_csc_rsp_with_exactly_the_approved_options()
         {
-            IReadOnlyList<string> asmdefs = FilesWithExtension(CoveredLotFolder, ".asmdef").Concat(FilesWithExtension(TestsFolder, ".asmdef")).ToList();
+            IReadOnlyList<string> asmdefs = RepositoryLayout.FilesWithExtension(CoveredLotFolder, ".asmdef").Concat(RepositoryLayout.FilesWithExtension(TestsFolder, ".asmdef")).ToList();
             var problems = new List<string>();
             foreach (string asmdef in asmdefs)
             {
@@ -366,12 +399,6 @@ namespace CoveredLot.Core.Tests
         private static IEnumerable<string> ApprovedOptions(string assembly) =>
             assembly == CoreAssembly ? OptionsOfEveryAssembly.Append(CoreOnlyOption) : OptionsOfEveryAssembly;
 
-        /// <summary>Every file under the folder whose extension is exactly the given one, compared ordinally.</summary>
-        private static IReadOnlyList<string> FilesWithExtension(string relativeFolder, string extension) => Directory
-            .EnumerateFiles(RepositoryLayout.FullPath(relativeFolder), "*" + extension, SearchOption.AllDirectories)
-            .Where(path => string.Equals(Path.GetExtension(path), extension, StringComparison.Ordinal))
-            .ToList();
-
         private static IReadOnlyList<string> PrecompiledReferences()
         {
             using JsonDocument document = JsonDocument.Parse(File.ReadAllText(RepositoryLayout.FullPath(CoreAsmdef), Encoding.UTF8));
@@ -379,26 +406,6 @@ namespace CoveredLot.Core.Tests
                 .Select(reference => reference.GetString())
                 .OfType<string>()
                 .ToList();
-        }
-
-        /// <summary>The assembly an asmref names: an assembly name, or "GUID:" and the guid of the asmdef's .meta file.</summary>
-        private static string ReferenceOf(string asmref)
-        {
-            using JsonDocument document = JsonDocument.Parse(File.ReadAllText(asmref, Encoding.UTF8));
-            return document.RootElement.TryGetProperty("reference", out JsonElement reference) ? reference.GetString() ?? string.Empty : string.Empty;
-        }
-
-        /// <summary>Core's assembly name and, once Unity has written the asmdef's .meta file, its GUID reference.</summary>
-        private static ISet<string> WaysToNameCore()
-        {
-            var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { CoreAssembly };
-            string meta = RepositoryLayout.FullPath(CoreAsmdef + ".meta");
-            if (File.Exists(meta) && MetaGuid.Match(File.ReadAllText(meta, Encoding.UTF8)) is { Success: true } guidLine)
-            {
-                names.Add("GUID:" + guidLine.Groups["guid"].Value);
-            }
-
-            return names;
         }
 
         private static string AssemblyName(string asmdef)

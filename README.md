@@ -82,7 +82,7 @@ Run these from the repository root in Git Bash:
   each under tr-TR and under sv-SE, and then `dotnet/CoveredLot.UnityChecks` under both
   cultures. It needs the Unity CLI (`unity`) and the .NET SDK, and the Unity editor closed: it
   refuses to start while `Temp/UnityLockfile` exists. Once the project is imported, a run takes
-  about two minutes. Before the Unity runs it deletes their old reports and logs in
+  two to four minutes. Before the Unity runs it deletes their old reports and logs in
   `artifacts/local/unity/`, Unity's build of the CoveredLot assemblies (in
   `Library/ScriptAssemblies/` and Bee's copies in `Library/Bee/artifacts/`) and any
   `Assembly-CSharp` DLL, so the first run compiles every CoveredLot assembly and everything
@@ -118,10 +118,15 @@ check:
   lets through;
 - the game's three asmdefs and the three test asmdefs, property by property, no other asmdef
   under `Assets/CoveredLot` or `Assets/Tests`, no C# source under `Assets` outside the folders
-  of those six, the `csc.rsp` rules, and that Unity and .NET compile the same files into Core;
+  of those six, no asmref anywhere under `Assets`, nothing in `Packages` but the manifest and
+  its lock file, no DLL under `Assets` but the two engine DLLs, the `csc.rsp` rules, and that
+  Unity and .NET compile the same files into Core; a file's extension counts in any letter
+  case, as MSBuild on Windows compiles `Copy.CS` too;
 - the rules UnityChecks applies to Unity's builds: the Client's own rules, each planted use
   reported and the clean sample passing, and the report and log rules, each kind of bad
-  report or log refused and the good ones passing (`dotnet/Shared/Samples`);
+  report or log refused and the good ones passing (`dotnet/Shared/Samples`); and the content
+  check of a build's PDB, on the PDB of the .NET build of Core, which records exactly the Core
+  sources, with a source added, deleted or edited, or a PDB the DLL does not name, refused;
 - the Unity project's files: the editor version, the Input System as the only input
   handling, the Android minimum API level 25, which Unity's own API cannot show below that
   floor, the domain reload on entering Play mode, the engine DLLs' import settings, the
@@ -179,11 +184,14 @@ before starting the editor.
 ## Checks of Unity's builds
 
 `dotnet/CoveredLot.UnityChecks` reads what the four Unity runs leave, and only
-`tools/check.sh` runs it. It fails when a CoveredLot DLL, a report or a log is missing, when a
-DLL is older than the newest source of its assembly, or when a report or a log is older than
-the newest DLL. Unity compiles by content, so after a touch or a checkout that changed no
-content, or after an editor session, run `tools/check.sh` rather than UnityChecks alone. It
-checks, on Unity's own builds:
+`tools/check.sh` runs it. It fails when a CoveredLot DLL, its PDB, a report or a log is
+missing, when a DLL is older than the newest source of its assembly, when a DLL was not built
+from exactly the `.cs` files its assembly's folder holds now, with their present content (the
+PDB Unity writes with each DLL records every source it compiled with the SHA-256 of its bytes,
+so a source added, moved, deleted or edited after the build is refused whatever its time), or
+when a report or a log is older than the newest DLL. Unity compiles by content, so after a
+touch or a checkout that changed no content, or after an editor session, run `tools/check.sh`
+rather than UnityChecks alone. It checks, on Unity's own builds:
 
 - every CoveredLot assembly, the tests' included: no generic or bare catch block, with or
   without a when-filter, no empty catch block, and no type reference to `System.Random` or
@@ -196,12 +204,17 @@ checks, on Unity's own builds:
   engine DLLs;
 - the Client and the Editor: none of the members that policy bans;
 - the Client: no member of the rules engine's types, no `ToString`, `Parse` or `TryParse` of a
-  number type, no number handed to `StringBuilder`'s `Append` or `Insert` or to `TextWriter`'s
-  or `Console`'s `Write` and `WriteLine`, no `String.Format`, no `String.Concat` of objects, no
-  `Convert.ToString`, and no `Color` or `Color32` constructed;
-- each run's report: at least one test, every test passed, none skipped, every test from that
+  number type, no number type handed as the value to `StringBuilder`'s `Append` or `Insert` or
+  to `TextWriter`'s or `Console`'s `Write` and `WriteLine`, no `String.Format`, no
+  `StringBuilder.AppendFormat` or `AppendJoin` (with or without a provider), no
+  `FormattableStringFactory.Create`, no `String.Concat` and no `TextWriter` or `Console` `Write`
+  or `WriteLine` overload that takes an object (a composite format's arguments, a boxed value),
+  no `Convert.ToString`, and no `Color` or `Color32` constructed;
+- each run's report: at least one test, every test passed, none skipped, the run's own result
+  Passed and no suite failed outside its tests (Unity records a failed one-time tear-down on its
+  fixture alone, so the counts stay whole and the editor still exits 0), every test from that
   mode's test assembly, and both tests of the culture guard, which wrote that it ran under the
-  run's culture;
+  run's culture and no other;
 - each run's log: a finished log of the editor the project pins, with no compiler warning
   about a file under `Assets/CoveredLot` or `Assets/Tests` (a compile that the same log shows
   Bee repeating does not count); and the four logs together show Unity compiling every

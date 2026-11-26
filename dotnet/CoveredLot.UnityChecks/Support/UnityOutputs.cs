@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -26,6 +27,7 @@ namespace CoveredLot.UnityChecks.Support
     {
         public const string ScriptAssembliesFolder = "Library/ScriptAssemblies";
         public const string RunsFolder = "artifacts/local/unity";
+        public const string AsmdefExtension = ".asmdef";
 
         private const string ProjectVersionFile = "ProjectSettings/ProjectVersion.txt";
         private const string EditorVersionKey = "m_EditorVersion: ";
@@ -41,7 +43,7 @@ namespace CoveredLot.UnityChecks.Support
             var assemblies = new List<UnityAssembly>();
             foreach (string folder in AssemblyFolders)
             {
-                foreach (string asmdef in Directory.EnumerateFiles(RepositoryLayout.FullPath(folder), "*.asmdef", SearchOption.AllDirectories))
+                foreach (string asmdef in RepositoryLayout.FilesWithExtension(folder, AsmdefExtension))
                 {
                     assemblies.Add(AssemblyOf(asmdef));
                 }
@@ -106,6 +108,8 @@ namespace CoveredLot.UnityChecks.Support
     /// <summary>A CoveredLot assembly: its name, and the folder of its asmdef, from the repository root with '/' separators.</summary>
     internal sealed record UnityAssembly
     {
+        private const string CSharpExtension = ".cs";
+
         public required string Name { get; init; }
 
         public required string Folder { get; init; }
@@ -114,9 +118,15 @@ namespace CoveredLot.UnityChecks.Support
 
         public string DllPath => RepositoryLayout.FullPath(DllRelativePath);
 
+        /// <summary>The portable PDB Unity writes with the DLL, which records every source it compiled with the SHA-256 of its bytes.</summary>
+        public string PdbRelativePath => UnityOutputs.ScriptAssembliesFolder + "/" + Name + ".pdb";
+
+        public string PdbPath => RepositoryLayout.FullPath(PdbRelativePath);
+
         /// <summary>
         /// Every file whose change Unity compiles into the assembly: the .cs files, the asmdef and csc.rsp in its folder and
-        /// below, leaving out a folder below that holds an asmdef of its own.
+        /// below, leaving out a folder below that holds an asmdef of its own. Names are compared in any letter case, as the
+        /// file system and MSBuild on Windows compare them.
         /// </summary>
         public IReadOnlyList<string> Sources()
         {
@@ -125,13 +135,25 @@ namespace CoveredLot.UnityChecks.Support
             return sources;
         }
 
+        /// <summary>The assembly's .cs files with the bytes they hold now, for the content check of its PDB.</summary>
+        public CurrentSources SourcesNow()
+        {
+            var files = new List<CurrentSource>();
+            foreach (string source in Sources().Where(path => RepositoryLayout.HasExtension(path, CSharpExtension)))
+            {
+                files.Add(new CurrentSource { RelativePath = RepositoryLayout.Relative(source), Content = File.ReadAllBytes(source).ToImmutableArray() });
+            }
+
+            return new CurrentSources { Folder = Folder, Files = files };
+        }
+
         /// <summary>Adds the sources in the folder, and in each folder below it that holds no asmdef of its own.</summary>
         private static void AddSources(string folder, List<string> sources)
         {
             sources.AddRange(Directory.EnumerateFiles(folder).Where(IsSource));
             foreach (string below in Directory.EnumerateDirectories(folder))
             {
-                if (!Directory.EnumerateFiles(below, "*.asmdef").Any())
+                if (!Directory.EnumerateFiles(below).Any(file => RepositoryLayout.HasExtension(file, UnityOutputs.AsmdefExtension)))
                 {
                     AddSources(below, sources);
                 }
@@ -139,9 +161,9 @@ namespace CoveredLot.UnityChecks.Support
         }
 
         private static bool IsSource(string path) =>
-            string.Equals(Path.GetExtension(path), ".cs", StringComparison.Ordinal)
-            || string.Equals(Path.GetExtension(path), ".asmdef", StringComparison.Ordinal)
-            || string.Equals(Path.GetFileName(path), "csc.rsp", StringComparison.Ordinal);
+            RepositoryLayout.HasExtension(path, CSharpExtension)
+            || RepositoryLayout.HasExtension(path, UnityOutputs.AsmdefExtension)
+            || string.Equals(Path.GetFileName(path), "csc.rsp", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>One of the four Unity test runs: its mode and the culture it was asked for, and the report and log it leaves.</summary>

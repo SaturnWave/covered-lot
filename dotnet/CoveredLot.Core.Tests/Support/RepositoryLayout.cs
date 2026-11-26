@@ -12,7 +12,7 @@ namespace CoveredLot.Core.Tests.Support
     /// dotnet/global.json, so the tests read the repository they were built from, wherever it is cloned. Lists the
     /// files git knows about as the engine's RepositoryLayout does: tracked files plus untracked files that
     /// .gitignore does not exclude, so build output is never inspected while a new file is checked before anyone
-    /// commits it.
+    /// commits it. Lists, too, every file on disk under a folder whose extension is a given one, in any letter case.
     /// </summary>
     internal static class RepositoryLayout
     {
@@ -32,6 +32,20 @@ namespace CoveredLot.Core.Tests.Support
 
         /// <summary>Repository-relative paths, with '/' separators, of every file git knows about; sorted ordinally.</summary>
         public static IReadOnlyList<string> Files() => KnownFiles.Value;
+
+        /// <summary>
+        /// The full paths of every file on disk under the folder (repository-relative, '/' separators), ignored ones
+        /// included, whose extension is the given one in any letter case. MSBuild on Windows compiles Copy.CS as it
+        /// compiles Copy.cs, so a guard that compared extensions exactly would miss a file the build takes.
+        /// </summary>
+        public static IReadOnlyList<string> FilesWithExtension(string relativeFolder, string extension) => Directory
+            .EnumerateFiles(FullPath(relativeFolder), "*", SearchOption.AllDirectories)
+            .Where(path => HasExtension(path, extension))
+            .ToList();
+
+        /// <summary>Whether the path ends in the extension (".cs", with its dot), in any letter case.</summary>
+        public static bool HasExtension(string path, string extension) =>
+            string.Equals(Path.GetExtension(path), extension, StringComparison.OrdinalIgnoreCase);
 
         private static IReadOnlyList<string> ListFilesKnownToGit()
         {

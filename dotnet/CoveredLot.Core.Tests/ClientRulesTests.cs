@@ -48,6 +48,15 @@ namespace CoveredLot.Core.Tests
             { "WrittenDecimal", "System.IO.TextWriter::Write(System.Decimal)", NumberText },
             { "WrittenLineOfAFloat", "System.IO.TextWriter::WriteLine(System.Single)", NumberText },
             { "ConsoleWrittenDouble", "System.Console::Write(System.Double)", NumberText },
+            { "AppendedFormatWithAProvider", "System.Text.StringBuilder::AppendFormat(System.IFormatProvider, ", TextFromValues },
+            { "AppendedJoinOfDoubles", "System.Text.StringBuilder::AppendJoin(System.String, System.Collections.Generic.IEnumerable`1<", TextFromValues },
+            { "AppendedJoinOfValues", "System.Text.StringBuilder::AppendJoin(System.String, System.ReadOnlySpan`1<System.Object>)", TextFromValues },
+            { "FormattableText", "System.Runtime.CompilerServices.FormattableStringFactory::Create(System.String, ", TextFromValues },
+            { "WrittenFormat", "System.IO.TextWriter::Write(System.String, System.Object)", TextFromValues },
+            { "WrittenLineOfAFormat", "System.IO.TextWriter::WriteLine(System.String, System.Object)", TextFromValues },
+            { "ConsoleWrittenLineOfAFormat", "System.Console::WriteLine(System.String, System.Object)", TextFromValues },
+            { "ConsoleWrittenFourValues", "System.Console::Write(System.String, System.ReadOnlySpan`1<System.Object>)", TextFromValues },
+            { "WrittenObject", "System.IO.TextWriter::Write(System.Object)", TextFromValues },
             { "NewColour", "UnityEngine.Color::.ctor(", Colour },
             { "NewColour32", "UnityEngine.Color32::.ctor(", Colour },
             { "DefaultColour", "the default value of UnityEngine.Color:", Colour },
@@ -86,10 +95,12 @@ namespace CoveredLot.Core.Tests
             IReadOnlyList<LocatedMemberUse> read = Scan.Value.MemberUses.Where(use => use.Location.StartsWith(CleanSample + "::", StringComparison.Ordinal)).ToList();
             IReadOnlyList<Violation> reported = Scan.Value.Violations.Where(violation => violation.Location.StartsWith(CleanSample + "::", StringComparison.Ordinal)).ToList();
 
-            // The rules read the clean sample's member uses: its string concatenation, comparison and join, and a builder's
-            // Insert whose Int32 index makes no text.
+            // The rules read the clean sample's member uses: its string concatenation, comparison and join, a builder's
+            // Insert whose Int32 index makes no text, and the string overloads of a writer's and the console's writes.
             Assert.Contains(read, use => use.Use.Display == "System.String::Concat(System.String, System.String)");
             Assert.Contains(read, use => use.Use.Display == "System.Text.StringBuilder::Insert(System.Int32, System.String)");
+            Assert.Contains(read, use => use.Use.Display == "System.IO.TextWriter::WriteLine(System.String)");
+            Assert.Contains(read, use => use.Use.Display == "System.Console::Write(System.String)");
             Assert.True(reported.Count == 0, "The Client's rules report the clean sample:\n" + string.Join("\n", reported));
         }
 

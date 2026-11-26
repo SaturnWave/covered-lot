@@ -11,21 +11,25 @@ namespace CoveredLot.Shared
     /// <item><description>names no member of the rules engine's JamRules, Attempt`3, LotLoader, LotText, LotSolver,
     /// LotPackBuilder or LotClues;</description></item>
     /// <item><description>calls no ToString, Parse or TryParse of a System number type, whatever provider it passes, and
-    /// hands no number to a member that writes its text: StringBuilder's Append and Insert, TextWriter's and Console's
-    /// Write and WriteLine;</description></item>
-    /// <item><description>calls no String.Format, with or without a provider, no String.Concat overload that takes an object,
-    /// and no Convert.ToString;</description></item>
+    /// hands no System number type, as the parameter that takes the value, to StringBuilder's Append and Insert or to
+    /// TextWriter's and Console's Write and WriteLine;</description></item>
+    /// <item><description>builds no text from values: no String.Format, StringBuilder.AppendFormat or StringBuilder.AppendJoin,
+    /// whichever overload and with or without a provider; no FormattableStringFactory.Create, whose FormattableString
+    /// formats with the device culture; no String.Concat overload, and no TextWriter or Console Write or WriteLine overload,
+    /// with an object parameter (Object, Object[] or ReadOnlySpan&lt;Object&gt;), which takes a composite format's
+    /// arguments or a boxed value; and no Convert.ToString;</description></item>
     /// <item><description>calls no UnityEngine.Color or Color32 constructor and sets neither to its default value
     /// (<c>new Color()</c> or <c>default</c>, which call no constructor).</description></item>
     /// </list>
     /// The member bans cover the ToString, Parse and TryParse of the integer types only, StringBuilder's Append and Insert of
-    /// an integer or an object only, refuse String.Format only without a provider, and refuse nothing of Convert, TextWriter
-    /// or Console; these rules close those gaps for the Client. Like the bans they name members, so these pass them: a number
-    /// formatted through Object.ToString (boxed, or as a generic T, as Debug.Log formats its message), a culture-sensitive
-    /// StringComparison value, Convert's parsing, DateTime text; a mention of a rules type that uses none of its members (a
-    /// local, a cast, typeof); and a colour that no constructor makes, such as Color's static colours (Color.red), Color.Lerp,
-    /// the conversion from Color32 or ColorUtility. Each rule is shown on planted samples (dotnet/Shared/Samples/ClientRuleSamples.cs)
-    /// by ClientRulesTests.
+    /// an integer or an object only, refuse String.Format and AppendFormat only without a provider, and refuse nothing of
+    /// AppendJoin, FormattableStringFactory, Convert, TextWriter or Console; these rules close those gaps for the Client. Like
+    /// the bans they name members, so these pass them: a number formatted through Object.ToString (boxed, in a Nullable, a
+    /// ValueTuple or a KeyValuePair, or as a generic T); a member outside System that formats its arguments, such as
+    /// UnityEngine's Debug.Log and Debug.LogFormat; a culture-sensitive StringComparison value; Convert's parsing; DateTime
+    /// text; a mention of a rules type that uses none of its members (a local, a cast, typeof); and a colour that no
+    /// constructor makes, such as Color's static colours (Color.red), Color.Lerp, the conversion from Color32 or ColorUtility.
+    /// Each rule is shown on planted samples (dotnet/Shared/Samples/ClientRuleSamples.cs) by ClientRulesTests.
     /// </summary>
     internal static class ClientRules
     {
@@ -38,7 +42,18 @@ namespace CoveredLot.Shared
         /// <summary>The members that build text from their arguments, whichever overload: Type::Member.</summary>
         private static readonly IReadOnlySet<string> TextFromValues = new HashSet<string>(StringComparer.Ordinal)
         {
-            "System.String::Format", "System.Convert::ToString",
+            "System.String::Format", "System.Text.StringBuilder::AppendFormat", "System.Text.StringBuilder::AppendJoin",
+            "System.Runtime.CompilerServices.FormattableStringFactory::Create", "System.Convert::ToString",
+        };
+
+        /// <summary>
+        /// The members that build text from their arguments in each overload with an object parameter (Type::Member): the
+        /// objects of String.Concat, and a writer's composite format arguments or boxed value.
+        /// </summary>
+        private static readonly IReadOnlySet<string> TextFromObjects = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "System.String::Concat", "System.IO.TextWriter::Write", "System.IO.TextWriter::WriteLine",
+            "System.Console::Write", "System.Console::WriteLine",
         };
 
         private static readonly IReadOnlySet<string> NumberTextMembers = new HashSet<string>(StringComparer.Ordinal)
@@ -68,7 +83,7 @@ namespace CoveredLot.Shared
             "System.Half", "System.Single", "System.Double", "System.Decimal", "System.Numerics.BigInteger",
         };
 
-        /// <summary>The parameter types of a String.Concat overload that takes objects, as signatures display them.</summary>
+        /// <summary>The parameter types of an overload that takes objects, as signatures display them.</summary>
         private static readonly IReadOnlySet<string> ObjectParameters = new HashSet<string>(StringComparer.Ordinal)
         {
             "System.Object", "System.Object[]", "System.ReadOnlySpan`1<System.Object>",
@@ -102,12 +117,13 @@ namespace CoveredLot.Shared
         private static IEnumerable<string> ReasonsAgainst(MemberUse use)
         {
             string type = use.DeclaringType.DefinitionName;
+            string member = type + "::" + use.MemberName;
             if (RulesTypes.Contains(type, StringComparer.Ordinal))
             {
                 yield return CallsRulesCode;
             }
 
-            bool writesANumber = ValueParameterOfWriters.TryGetValue(type + "::" + use.MemberName, out int valueParameter)
+            bool writesANumber = ValueParameterOfWriters.TryGetValue(member, out int valueParameter)
                 && valueParameter < use.Parameters.Count
                 && NumberTypes.Contains(use.Parameters[valueParameter].Display);
             if ((NumberTypes.Contains(type) && NumberTextMembers.Contains(use.MemberName)) || writesANumber)
@@ -115,9 +131,8 @@ namespace CoveredLot.Shared
                 yield return MakesNumberText;
             }
 
-            bool concatenatesObjects = type == "System.String" && use.MemberName == "Concat"
-                && use.Parameters.Any(parameter => ObjectParameters.Contains(parameter.Display));
-            if (TextFromValues.Contains(type + "::" + use.MemberName) || concatenatesObjects)
+            bool formatsObjects = TextFromObjects.Contains(member) && use.Parameters.Any(parameter => ObjectParameters.Contains(parameter.Display));
+            if (TextFromValues.Contains(member) || formatsObjects)
             {
                 yield return BuildsTextFromValues;
             }

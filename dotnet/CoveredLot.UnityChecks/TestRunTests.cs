@@ -11,8 +11,10 @@ namespace CoveredLot.UnityChecks
     /// <summary>
     /// The verdicts of the four Unity test runs (design section 10.4). The editor exits 0 even when no test ran, so each
     /// run's NUnit report must show at least one test, every test passed (none failed, skipped, ignored or inconclusive),
-    /// every test from the run's own test assembly, and both tests of that mode's culture guard among them, the guard
-    /// having written that it ran under the run's culture. Each run's editor log must be a finished log of the editor the
+    /// the run's own result Passed and no suite failed outside its tests (Unity records a failed one-time tear-down on its
+    /// fixture alone, so the counts stay whole and the editor still exits 0), every test from the run's own test assembly,
+    /// and both tests of that mode's culture guard among them, the guard having written that it ran under the run's culture
+    /// and no other. Each run's editor log must be a finished log of the editor the
     /// project pins and report no compiler warning about a file under Assets/CoveredLot or Assets/Tests; and the four logs
     /// together must show Unity compiling every CoveredLot assembly, or there is no compiler output for that rule to read.
     /// CoveredLot.Core.Tests shows each rule on doctored reports and logs (UnityTestReportTests and UnityEditorLogTests there).

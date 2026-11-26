@@ -15,7 +15,7 @@ namespace CoveredLot.Core.Tests
     /// name our folders without a warning, pass; each warning about a file under Assets/CoveredLot or Assets/Tests is
     /// reported with its line, its file and its code, whichever slash the path is written with, unless the log compiles
     /// the same assembly again later; and the assemblies a log compiles are those Bee writes a compile line for, so a log
-    /// in which Bee only copies its earlier build compiles none.
+    /// in which Bee only copies its earlier build compiles none, and Bee's "[BUSY ...]" progress line is no compile line.
     /// </summary>
     public sealed class UnityEditorLogTests
     {
@@ -113,13 +113,18 @@ namespace CoveredLot.Core.Tests
             Assert.Equal(new[] { "CoveredLot.Client", "CoveredLot.Tests.Support" }, UnityEditorLog.CompiledAssemblies(Lines("stale-pass.txt")));
         }
 
-        /// <summary>A log in which Bee only copies its earlier build holds no compiler output, so it shows nothing about warnings.</summary>
+        /// <summary>
+        /// A log in which Bee only copies its earlier build holds no compiler output, so it shows nothing about warnings; the
+        /// "[BUSY ...]" progress line Bee writes while a compile runs is no compile of its own.
+        /// </summary>
         [Fact]
         public void Logs_that_only_copy_an_earlier_build_leave_every_assembly_uncompiled()
         {
             IReadOnlyList<string> copiesOnly = Lines("no-compile.txt");
 
             Assert.Contains(copiesOnly, line => line.Contains("CopyFiles Library/ScriptAssemblies/CoveredLot.Core.dll", StringComparison.Ordinal));
+            Assert.Contains(copiesOnly, line => line.StartsWith("[BUSY ", StringComparison.Ordinal)
+                && line.Contains("] Csc Library/Bee/artifacts/0123abcd.dag/CoveredLot.Core.dll", StringComparison.Ordinal));
             Assert.Equal(CoveredLotAssemblies, UnityEditorLog.UncompiledAssemblies(new[] { copiesOnly }, CoveredLotAssemblies));
             Assert.Equal(new[] { "CoveredLot.Core", "CoveredLot.Editor", "CoveredLot.Tests.EditMode", "CoveredLot.Tests.PlayMode" },
                 UnityEditorLog.UncompiledAssemblies(new[] { copiesOnly, Lines("stale-pass.txt") }, CoveredLotAssemblies));

@@ -8,18 +8,20 @@
 #      - the old reports and logs, so one of an earlier run can never stand in for a run that wrote none;
 #      - Unity's build of the CoveredLot assemblies: the DLLs and PDBs in Library/ScriptAssemblies, and Bee's own
 #        copies of them in Library/Bee/artifacts, so the first run compiles every CoveredLot assembly from the current
-#        sources and its log holds the compiler's output, which UnityChecks reads. Without the Bee copies Unity only
-#        copies its earlier build back, and a source whose time changed but whose content did not (a touch, a
-#        checkout) keeps a DLL older than itself, which UnityChecks refuses;
+#        sources and its log holds the compiler's output, which UnityChecks reads. If only the ScriptAssemblies copies
+#        were deleted, Unity would copy Bee's earlier build back, each file with the time of the copy, and compile
+#        nothing, so no log would show a compile. If neither were deleted, a source whose time changed but whose content
+#        did not (a touch, a checkout) would keep a DLL older than itself, because Unity compiles by content, and
+#        UnityChecks refuses such a DLL;
 #      - any Assembly-CSharp DLL in Library/ScriptAssemblies, which Unity builds from scripts outside every asmdef
 #        folder, so UnityChecks finds one only when these runs built it;
 #   4. the repository after those runs: no *.meta file is untracked, and git status, the diff against HEAD and the
 #      untracked files are as they were before the runs (a session that does not quit at once saves the upgrades that
 #      packages make on load);
 #   5. dotnet/CoveredLot.UnityChecks, under tr-TR and under sv-SE: the IL rules over Unity's build of the CoveredLot
-#      assemblies, and the reports and logs of the four runs.
+#      assemblies, the sources their PDBs record, and the reports and logs of the four runs.
 # It needs the Unity CLI (`unity`) and the .NET SDK that dotnet/global.json pins, and the Unity editor closed: it
-# refuses to start while Temp/UnityLockfile exists. Once the project is imported, a full run takes about two minutes,
+# refuses to start while Temp/UnityLockfile exists. Once the project is imported, a full run takes two to four minutes,
 # most of it the four Unity runs; in a fresh clone the first run imports the whole project first. It checks the
 # repository it belongs to, from whatever folder it is started.
 #

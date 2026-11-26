@@ -13,7 +13,9 @@ namespace CoveredLot.Core.Tests
     /// runs, shown on doctored reports in the form a Unity run writes (dotnet/Shared/Samples/UnityReports): a report of the
     /// EditMode tests under tr-TR in which every test and both tests of the culture guard passed, and the guard wrote that
     /// it ran under tr-TR, has no problem; each way a report can fail to prove that run is reported, a report of another
-    /// culture or of the other mode's assembly among them.
+    /// culture or of the other mode's assembly among them. A fixture that failed in its one-time tear-down leaves every
+    /// test passed, and is refused through the run's own result and its own, in both forms Unity writes; a suite that
+    /// failed only through a child is not named, and the test assembly's suite is named by its name, not its full name.
     /// </summary>
     public sealed class UnityTestReportTests
     {
@@ -42,6 +44,7 @@ namespace CoveredLot.Core.Tests
             { "no-culture-guard.xml", "holds no test " + HostilityTest + " of the culture guard" },
             { "one-guard-test.xml", "holds no test " + HostilityTest + " of the culture guard" },
             { "no-culture-output.xml", "the culture guard's " + NameTest + " wrote no line \"culture under test: ...\"" },
+            { "two-cultures.xml", "the culture guard's " + NameTest + " ran under sv-SE, not under tr-TR" },
             { "stray-test.xml", "runs tests of another assembly, Assembly-CSharp-Editor.dll, which carry neither [HostileCulture] nor our csc.rsp: StrayTests.Runs_unguarded" },
             { "cut-short.xml", "does not parse as XML: " },
             { "other-format.xml", "is not an NUnit 3 report: its root element is not test-run" },
@@ -70,6 +73,40 @@ namespace CoveredLot.Core.Tests
 
             Assert.True(problems.Any(found => found.Contains(problem, StringComparison.Ordinal)),
                 report + " is not refused for '" + problem + "'; its problems: " + (problems.Count == 0 ? "none" : string.Join("; ", problems)));
+        }
+
+        /// <summary>
+        /// Unity records a failed one-time tear-down on its fixture alone, so every test passed, the counts are whole and the
+        /// editor exits 0; only the run's own result and the fixture's show it: with site TearDown for an [OneTimeTearDown],
+        /// and with no site for an [UnityOneTimeTearDown] (both forms as a Unity run wrote them). The suites above the
+        /// fixture, which failed only through it, are not named.
+        /// </summary>
+        [Theory]
+        [InlineData("teardown-failed.xml", "the suite CoveredLot.Tests.EditMode.PlantedOneTimeTearDownTests failed outside its tests (site TearDown): "
+            + "Unhandled log message: '[Error] planted'. Use UnityEngine.TestTools.LogAssert.Expect")]
+        [InlineData("unity-teardown-failed.xml", "the suite CoveredLot.Tests.EditMode.PlantedUnityOneTimeTearDownTests failed outside its tests (no site): "
+            + "OneTimeTearDown : Unhandled log message: '[Error] planted'. Use UnityEngine.TestTools.LogAssert.Expect")]
+        public void A_report_whose_tests_all_passed_is_refused_when_a_fixture_failed_in_its_one_time_tear_down(string report, string suiteProblem)
+        {
+            IReadOnlyList<string> problems = UnityTestReport.Problems(Text(report), EditModeUnderTurkish);
+
+            Assert.Equal(new[] { "the run's own result is Failed(Child), not Passed", suiteProblem }, problems);
+        }
+
+        /// <summary>
+        /// An Assembly suite's full name is the DLL's path on the machine that ran it, so a failed one is named by its name,
+        /// with the first line of its message.
+        /// </summary>
+        [Fact]
+        public void A_failed_test_assembly_suite_is_named_by_its_name_and_the_first_line_of_its_message()
+        {
+            IReadOnlyList<string> problems = UnityTestReport.Problems(Text("assembly-failed.xml"), EditModeUnderTurkish);
+
+            Assert.Equal(new[]
+            {
+                "the run's own result is Failed(Child), not Passed",
+                "the suite CoveredLot.Tests.EditMode.dll failed outside its tests (site TearDown): OneTimeTearDown : System.InvalidOperationException : planted",
+            }, problems);
         }
 
         /// <summary>The reports of a tr-TR and an sv-SE run differ in nothing else, so a tr-TR report must not pass for an sv-SE run.</summary>

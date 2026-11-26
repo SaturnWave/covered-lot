@@ -13,7 +13,8 @@ namespace CoveredLot.Tests.EditMode
     /// base class, so no test runs under this machine's culture by accident. A fixture is a class that carries a fixture
     /// attribute such as [TestFixture], or has a test method: one marked with any attribute that makes NUnit or Unity build a
     /// test ([Test], [TestCase], [TestCaseSource], [Theory], [UnityTest] and the like), declared or inherited. The editor
-    /// loads the PlayMode tests as well, so this one EditMode guard sees both test assemblies and the support assembly.
+    /// loads the PlayMode tests as well, so this one EditMode guard sees both test assemblies and the support assembly. A type
+    /// of theirs that does not load fails the guard, which names its assembly.
     /// </summary>
     [HostileCulture]
     public sealed class FixtureGuardTests
@@ -27,7 +28,17 @@ namespace CoveredLot.Tests.EditMode
         [Test]
         public void Every_fixture_of_the_CoveredLot_test_assemblies_carries_HostileCulture()
         {
-            IReadOnlyList<Type> fixtures = TestAssemblies().SelectMany(assembly => assembly.GetTypes()).Where(IsFixture).ToList();
+            var fixtures = new List<Type>();
+            foreach (Assembly assembly in TestAssemblies())
+            {
+                foreach (Type type in TypesOf(assembly))
+                {
+                    if (IsFixture(type))
+                    {
+                        fixtures.Add(type);
+                    }
+                }
+            }
 
             IReadOnlyList<string> unguarded = fixtures
                 .Where(fixture => !fixture.IsDefined(typeof(HostileCultureAttribute), inherit: true))
@@ -53,8 +64,48 @@ namespace CoveredLot.Tests.EditMode
             return loaded;
         }
 
-        private static bool IsFixture(Type type) =>
-            type.IsClass && (CarriesFixtureAttribute(type) || type.GetMethods(AnyMethod).Any(IsTestMethod));
+        /// <summary>
+        /// The assembly's types. One that does not load, such as a fixture whose base type or attribute comes from an assembly
+        /// that is missing, fails the guard with the assembly's name; the loader's message lists each type that did not load.
+        /// </summary>
+        private static Type[] TypesOf(Assembly assembly)
+        {
+            try
+            {
+                return assembly.GetTypes();
+            }
+            catch (ReflectionTypeLoadException exception)
+            {
+                throw new AssertionException(NameOf(assembly) + " holds types that do not load: " + exception.Message, exception);
+            }
+        }
+
+        /// <summary>
+        /// Whether NUnit or Unity builds tests from the class. It runs in plain loops, so an attribute that does not load fails
+        /// the guard here, not inside a query that the failure's stack would show instead of the type.
+        /// </summary>
+        private static bool IsFixture(Type type)
+        {
+            if (!type.IsClass)
+            {
+                return false;
+            }
+
+            if (CarriesFixtureAttribute(type))
+            {
+                return true;
+            }
+
+            foreach (MethodInfo method in type.GetMethods(AnyMethod))
+            {
+                if (IsTestMethod(method))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
 
         private static bool CarriesFixtureAttribute(Type type) => type.GetCustomAttributes(inherit: true).Any(attribute => attribute is IFixtureBuilder);
 

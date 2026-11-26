@@ -30,13 +30,20 @@ namespace CoveredLot.Shared
     /// <list type="bullet">
     /// <item><description>it holds at least one test and every test passed: none failed, none was skipped, ignored or
     /// inconclusive;</description></item>
+    /// <item><description>the run's own result is Passed, and no suite failed outside its tests. Unity records a failed
+    /// one-time tear-down ([OneTimeTearDown] or [UnityOneTimeTearDown] that throws, or logs an error that no LogAssert
+    /// expects) on its fixture alone: every test keeps its Passed, so the counts stay whole and the editor still exits 0,
+    /// and only the fixture's result and the run's own (Failed(Child)) show it. Each such suite is named with its site and
+    /// the first line of its message; a suite that failed only through its children (site Child) or its parent (site
+    /// Parent) is not, since the test or suite that failed is. An Assembly suite is named by its name, because its full
+    /// name is the DLL's path on the machine that ran it;</description></item>
     /// <item><description>every test in it belongs to the expected test assembly: a test compiled into any other assembly
     /// (Assembly-CSharp-Editor, say, from a script outside the asmdef folders) carries neither [HostileCulture] nor our
     /// csc.rsp, and FixtureGuardTests never sees it;</description></item>
     /// <item><description>both tests of the culture guard are in it and passed, and the guard's name test wrote the culture
-    /// it ran under (a line "culture under test: tr-TR", which CultureGuardFixture writes) and that culture is the expected
-    /// one. Nothing else in a report shows the culture: the reports of a tr-TR run and an sv-SE run differ only in their
-    /// times, ids and seeds.</description></item>
+    /// it ran under (a line "culture under test: tr-TR", which CultureGuardFixture writes), the expected one and no other.
+    /// Nothing else in a report shows the culture: the reports of a tr-TR run and an sv-SE run differ only in their times,
+    /// ids and seeds.</description></item>
     /// </list>
     /// The guard's tests are found by their full name, which starts with the fixture that runs them; their classname names
     /// the class that declares them, the shared base class CoveredLot.Tests.Support.CultureGuardFixture. UnityTestReportTests
@@ -54,6 +61,14 @@ namespace CoveredLot.Shared
         public const string HostilityTest = "The_culture_breaks_at_least_one_invariant_assumption";
 
         private const string PassedResult = "Passed";
+        private const string FailedResult = "Failed";
+
+        /// <summary>The type NUnit gives the suite of a test assembly.</summary>
+        private const string AssemblySuite = "Assembly";
+
+        /// <summary>The sites of a suite that failed only because a child failed, or because its parent failed before it ran.</summary>
+        private const string ChildSite = "Child";
+        private const string ParentSite = "Parent";
 
         /// <summary>How many test names a problem lists before it only counts the rest.</summary>
         private const int NamesShown = 20;
@@ -92,6 +107,7 @@ namespace CoveredLot.Shared
             var counts = new RunCounts { Total = total, Passed = passed, Failed = failed, Skipped = skipped, Inconclusive = inconclusive };
             IReadOnlyList<XElement> cases = run.Descendants("test-case").ToList();
             return CountProblems(counts, cases)
+                .Concat(ResultProblems(run))
                 .Concat(AssemblyProblems(run, expected))
                 .Concat(CultureGuardProblems(cases, expected))
                 .ToList();
@@ -125,11 +141,49 @@ namespace CoveredLot.Shared
             }
         }
 
+        /// <summary>
+        /// The run's own result must be Passed, and each suite that failed outside its tests is named. A test's failure
+        /// gives each suite above it the result Failed with site Child, and its counts already name the test.
+        /// </summary>
+        private static IEnumerable<string> ResultProblems(XElement run)
+        {
+            string? result = (string?)run.Attribute("result");
+            if (result != PassedResult)
+            {
+                yield return result is null ? "its test-run element has no result" : "the run's own result is " + result + ", not " + PassedResult;
+            }
+
+            foreach (XElement suite in run.Descendants("test-suite").Where(FailedOutsideItsTests))
+            {
+                yield return "the suite " + SuiteName(suite) + " failed outside its tests (" + SiteOf(suite) + "): " + FirstLineOfMessage(suite);
+            }
+        }
+
+        /// <summary>
+        /// A suite that failed on its own account: in a one-time set-up or tear-down (site SetUp or TearDown), or with no
+        /// site, which is how Unity records an [UnityOneTimeTearDown] that logs an error no LogAssert expects.
+        /// </summary>
+        private static bool FailedOutsideItsTests(XElement suite) =>
+            (string?)suite.Attribute("result") == FailedResult && (string?)suite.Attribute("site") is not (ChildSite or ParentSite);
+
+        private static string SiteOf(XElement suite) => (string?)suite.Attribute("site") is string site ? "site " + site : "no site";
+
+        /// <summary>The suite's full name; an Assembly suite's name, since its full name is the DLL's path on the machine that ran it.</summary>
+        private static string SuiteName(XElement suite) =>
+            (string?)suite.Attribute("type") == AssemblySuite ? NameOf(suite) : (string?)suite.Attribute("fullname") ?? NameOf(suite);
+
+        private static string FirstLineOfMessage(XElement suite) =>
+            ((string?)suite.Element("failure")?.Element("message") ?? string.Empty)
+                .Split('\n')
+                .Select(line => line.Trim())
+                .FirstOrDefault(line => line.Length > 0)
+            ?? "it gives no message";
+
         /// <summary>The report's test assemblies, as NUnit's Assembly suites name them, must be the expected one alone.</summary>
         private static IEnumerable<string> AssemblyProblems(XElement run, ExpectedTestRun expected)
         {
             string expectedSuite = expected.TestAssembly + ".dll";
-            IReadOnlyList<XElement> suites = run.Descendants("test-suite").Where(suite => (string?)suite.Attribute("type") == "Assembly").ToList();
+            IReadOnlyList<XElement> suites = run.Descendants("test-suite").Where(suite => (string?)suite.Attribute("type") == AssemblySuite).ToList();
             if (!suites.Any(suite => NameOf(suite) == expectedSuite))
             {
                 yield return "holds no test of the test assembly " + expectedSuite;

@@ -1,6 +1,7 @@
-Doctored for UnityEditorLogTests, in the form of lines from a Unity editor log: no source changed since Bee's last build, so Bee copies the CoveredLot assemblies it built before and compiles none of them.
+Doctored for UnityEditorLogTests, in the form of lines from a Unity editor log: no source changed since Bee's last build, so Bee copies the CoveredLot assemblies it built before and compiles none of them. Its one Csc line is the "[BUSY ...]" progress line Bee writes while a compile still runs, which is no compile of its own.
 Built from '6000.3/staging' branch; Version is '6000.3.29f1 (0123456789ab) revision 1234567'; Using compiler version '194234433'; Build Type 'Release'
 [ScriptCompilation] Requested script compilation because: Assetdatabase observed changes in script compilation related files
+[BUSY       6s] Csc Library/Bee/artifacts/0123abcd.dag/CoveredLot.Core.dll (+2 others)
 [711/722    0s] CopyFiles Library/ScriptAssemblies/CoveredLot.Core.dll
 [712/722    0s] CopyFiles Library/ScriptAssemblies/CoveredLot.Client.dll
 [713/722    0s] CopyFiles Library/ScriptAssemblies/CoveredLot.Editor.dll

@@ -12,14 +12,18 @@ namespace CoveredLot.UnityChecks
 {
     /// <summary>
     /// The inputs of every other check here are present and current (design section 10.4): Unity built one assembly per
-    /// CoveredLot asmdef, none older than the newest source of its assembly (.cs, .asmdef, csc.rsp), and each holds code the
-    /// scans read; it built no assembly from a script outside the asmdef folders; and each of the four test runs left its
-    /// report and its log, both written after the newest CoveredLot DLL. A DLL older than its sources would let the IL checks
-    /// pass on code that is no longer there, and a report or log older than the DLLs would judge code that is no longer the
-    /// code they scan. tools/check.sh deletes the reports, the logs and Unity's build of the CoveredLot assemblies before its
-    /// Unity runs, so its first run compiles the assemblies and every report and log comes after them. Unity compiles by
-    /// content, so after a source's time changes without its content (a touch, a checkout) its DLL stays older than it, and
-    /// a run of these checks alone fails until tools/check.sh builds the DLL again.
+    /// CoveredLot asmdef, none older than the newest source of its assembly (.cs, .asmdef, csc.rsp), each from exactly the
+    /// .cs files its folder holds now with the content they hold now, and each holds code the scans read; it built no
+    /// assembly from a script outside the asmdef folders; and each of the four test runs left its report and its log, both
+    /// written after the newest CoveredLot DLL. A DLL built from other sources would let the IL checks pass on code that is
+    /// no longer there, and a report or log older than the DLLs would judge code that is no longer the code they scan. The
+    /// times alone miss a source that keeps an older time, as a copy, an unpacked archive or git mv keeps it, a deleted
+    /// source, and an edit given its old time back; the portable PDB Unity writes with each DLL records every source it
+    /// compiled with the SHA-256 of its bytes, which <see cref="CompiledSources"/> compares with the folder. Only the
+    /// times show a change to the asmdef or csc.rsp. tools/check.sh deletes the reports, the logs and Unity's build of the
+    /// CoveredLot assemblies before its Unity runs, so its first run compiles the assemblies and every report and log comes
+    /// after them. Unity compiles by content, so after a source's time changes without its content (a touch, a checkout)
+    /// its DLL stays older than it, and a run of these checks alone fails until tools/check.sh builds the DLL again.
     /// </summary>
     public sealed class InputsTests
     {
@@ -42,6 +46,26 @@ namespace CoveredLot.UnityChecks
             (string newest, DateTime changed) = Newest(sources);
             Assert.True(built >= changed, assembly.DllRelativePath + " was written at " + Time(built) + ", before " + RepositoryLayout.Relative(newest)
                 + " changed at " + Time(changed) + "; run the Unity tests again, as tools/check.sh does.");
+        }
+
+        /// <summary>
+        /// The PDB Unity writes with the DLL records each source it compiled with the SHA-256 of its bytes, so it shows a
+        /// source added, moved or deleted since the build, or edited, whatever its time says.
+        /// </summary>
+        [Theory]
+        [MemberData(nameof(AssemblyNames))]
+        public void Unity_built_the_assembly_from_exactly_the_sources_its_folder_holds_now(string name)
+        {
+            UnityAssembly assembly = UnityOutputs.Assembly(name);
+            Assert.True(File.Exists(assembly.DllPath), assembly.DllRelativePath + " is missing: " + RunTheChecks);
+            Assert.True(File.Exists(assembly.PdbPath), assembly.PdbRelativePath + " is missing: " + RunTheChecks);
+            CurrentSources current = assembly.SourcesNow();
+
+            IReadOnlyList<string> problems = CompiledSources.Problems(CompiledSources.Read(BuildFiles.Beside(assembly.DllPath)), current);
+
+            Assert.NotEmpty(current.Files);
+            Assert.True(problems.Count == 0, assembly.DllRelativePath + " was not built from the sources " + assembly.Folder + " holds now:\n"
+                + string.Join("\n", problems.Select(problem => "  " + problem)) + "\nRun the Unity tests again, as tools/check.sh does.");
         }
 
         /// <summary>The scans of the other checks read method bodies, so an assembly whose bodies they cannot read passes them all.</summary>

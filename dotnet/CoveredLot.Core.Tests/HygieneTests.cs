@@ -248,11 +248,8 @@ namespace CoveredLot.Core.Tests
         /// <summary>This test assembly, which compiles the planted samples of dotnet/Shared/Samples.</summary>
         private static AssemblyScanner SampleScanner() => new(typeof(HygieneTests).Assembly.Location);
 
-        /// <summary>The files the .NET build compiles into Core.</summary>
-        private static IReadOnlyList<string> CoreSources() => Directory
-            .EnumerateFiles(RepositoryLayout.FullPath(CoreFolder), "*.cs", SearchOption.AllDirectories)
-            .Where(path => string.Equals(Path.GetExtension(path), ".cs", StringComparison.Ordinal))
-            .ToList();
+        /// <summary>The files the .NET build compiles into Core: every .cs under the Core folder, in any letter case.</summary>
+        private static IReadOnlyList<string> CoreSources() => RepositoryLayout.FilesWithExtension(CoreFolder, ".cs");
 
         /// <summary>Each line of the source that the pattern matches, as path:line.</summary>
         private static IEnumerable<string> LinesMatching(string source, Regex pattern) => File.ReadAllLines(source)
