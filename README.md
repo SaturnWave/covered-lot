@@ -107,13 +107,28 @@ check:
 - the culture guard;
 - the build guard (`dotnet/Directory.Build.targets`) with its analyzer settings, and that no
   other MSBuild or analyzer config file can override it;
+- the level catalogue (`LevelCatalogue.Load`): over the shipped texts on disk it gives the
+  Example first, with the par the engine's solver finds, then Level 1 to N in the order
+  `presentation.json` lists them, each with the slot and the par that file gives and the level
+  its own text loads to; over fakes it gives the first problem of each source that has one, in
+  a fixed order (the presentation file, the Example, then the listed levels), and it gives
+  every broken text as a problem without throwing, a broken text for every `LoadProblem` and
+  for every `LotTextProblem` the engine's reader returns among them;
+- the catalogue's copy: the problem screen's sentence and the exact development line of each
+  kind of problem (`slot 0003: line 1, wrong header`), with words for every `LotTextProblem`
+  and `LoadProblem` value the engine declares, all printable ASCII without a banned word;
+- the closed sets the catalogue switches over or makes, pinned case by case: the engine's
+  `LotTextProblem`, `LoadProblem`, `LotTextResult`, `LoadResult`, `PresentationReadResult` and
+  `PeakParResult`, and Core's own;
 - the compiled Core: no catch block at all, no `System.Random` or `UnityEngine.Random`, no
   async, no static field that can be reassigned, and no reference beyond what its asmdef
   gives it in Unity;
 - the compiled Core against the engine's Unity-bound API policy: no floating point and nothing
   the policy refuses, with each planted violation reported and the clean samples passing;
 - that no Core source opens an `unchecked` context, so the integer arithmetic it writes
-  stays overflow-checked;
+  stays overflow-checked; and that the compiled Core holds overflow-checked arithmetic
+  (`add.ovf` and the like) while no Core source opens a `checked` context of its own, which
+  shows that the build checked overflow;
 - that no Core source names a culture-sensitive `StringComparison` value, which the policy
   lets through;
 - the game's three asmdefs and the three test asmdefs, property by property, no other asmdef
@@ -158,11 +173,13 @@ tests check:
   no-break-space digit groups);
 - `[HostileCulture]` itself, driven on a fresh instance: it applies the culture to all four
   and puts back each of the four it found;
-- the engine and the levels inside Unity: `presentation.json`, the 98 levels it lists and the
-  Example load from Resources and read and load through the engine DLLs; each level written
-  back gives its asset text; each listed level has its presentation fingerprint; and on the
-  Example, tapping vehicle 5 first is rejected, blocked by vehicle 4, and changes nothing, the
-  taps 0,3,4,2,8,5,1,6,7 win, and the taps 0,3,1,8 fill the bays and fail;
+- Core's level catalogue inside Unity: fed the texts Resources holds by a test-only host, it
+  loads the Example first with par 3, then the 98 levels `presentation.json` lists as Level 1
+  to 98, each with the slot and par that file gives; each level it loaded writes back to its
+  asset text, and each listed level has its presentation fingerprint; a level text that
+  Resources lacks gives its development line; and on the catalogue's Example, tapping vehicle
+  5 first is rejected, blocked by vehicle 4, and changes nothing, the taps 0,3,4,2,8,5,1,6,7
+  win, and the taps 0,3,1,8 fill the bays and fail;
 - the settings that Unity reads through its own APIs: portrait, the product name
   `Covered Lot`, which is also the title the game shows, the Android application id, IL2CPP,
   ARM64 only, API level 25 (Unity reads a lower saved level as 25, so the .NET checks pin the
@@ -201,7 +218,9 @@ rather than UnityChecks alone. It checks, on Unity's own builds:
 - Core, the Client and the Editor: no async state machine;
 - Core: no catch block at all, no static field that can be reassigned, no floating point,
   nothing the Unity-bound API policy refuses, and no reference beyond netstandard and the two
-  engine DLLs;
+  engine DLLs; and overflow-checked arithmetic (`add.ovf` and the like), which shows that
+  Unity applied the `-checked+` of Core's `csc.rsp`, since no Core source opens a `checked`
+  context of its own;
 - the Client and the Editor: none of the members that policy bans;
 - the Client: no member of the rules engine's types, no `ToString`, `Parse` or `TryParse` of a
   number type, no number type handed as the value to `StringBuilder`'s `Append` or `Insert` or
@@ -225,5 +244,4 @@ rather than UnityChecks alone. It checks, on Unity's own builds:
 
 These rules name types and members, so they show that the code uses none of those, not that it
 makes no culture-dependent text: the comments of `UnityBoundApiPolicy` and `ClientRules` in
-`dotnet/Shared` list what passes them. Whether Unity applied Core's overflow checks is not
-checked yet.
+`dotnet/Shared` list what passes them.

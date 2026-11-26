@@ -144,6 +144,20 @@ namespace CoveredLot.Shared
     }
 
     /// <summary>
+    /// One instruction of a method body, where it is and its opcode's name (see
+    /// <see cref="AssemblyScanner.OverflowCheckedArithmetic"/>), for example "add.ovf".
+    /// </summary>
+    internal sealed record LocatedInstruction
+    {
+        /// <summary>The method and IL offset, for example "CoveredLot.Core.X::Run+IL_0004".</summary>
+        public required string Location { get; init; }
+
+        public required string OpCodeName { get; init; }
+
+        public override string ToString() => Location + ": " + OpCodeName;
+    }
+
+    /// <summary>
     /// One external type that a type definition names in its declarations (see
     /// <see cref="AssemblyScanner.DeclaredExternalTypes"/>), for example System.Collections.Generic.IReadOnlyList`1.
     /// </summary>
@@ -166,10 +180,11 @@ namespace CoveredLot.Shared
     /// port of the engine's AssemblyInspection (SaturnWave/puzzle-engine, tests/PuzzleCore.Tests/Support/AssemblyInspection.cs):
     /// its catch regions, type, member and assembly references, floating-point scan and platform-API policy walk, with the
     /// signature shapes and the stack-flow walk by which the policies judge each call. The engine's list of type mentions,
-    /// which only its bot guard uses, is left out. Six scans of this repository's own are added: every catch block
+    /// which only its bot guard uses, is left out. Seven scans of this repository's own are added: every catch block
     /// (Core has none at all), async state machines, static fields that can be reassigned, the external types each type
-    /// declares, the members each method body names with their signatures and IL offsets, and the structs set to their
-    /// default value (the last two serve the Client's own rules, <see cref="ClientRules"/>).
+    /// declares, the members each method body names with their signatures and IL offsets, the structs set to their
+    /// default value (these two serve the Client's own rules, <see cref="ClientRules"/>), and the overflow-checked
+    /// arithmetic, which shows that a build checked overflow.
     /// </summary>
     internal sealed class AssemblyScanner : IDisposable
     {
@@ -218,6 +233,12 @@ namespace CoveredLot.Shared
         {
             "CoveredLot.Core", "PuzzleCore", "PuzzleCore.Jam",
         };
+
+        /// <summary>The integer additions, subtractions and multiplications that throw on overflow, signed and unsigned.</summary>
+        private static readonly IReadOnlySet<short> OverflowCheckedArithmeticOpCodes = new[]
+        {
+            OpCodes.Add_Ovf, OpCodes.Add_Ovf_Un, OpCodes.Sub_Ovf, OpCodes.Sub_Ovf_Un, OpCodes.Mul_Ovf, OpCodes.Mul_Ovf_Un,
+        }.Select(opCode => opCode.Value).ToHashSet();
 
         /// <summary>Instructions an empty catch compiles to: drop or store the exception, then leave.</summary>
         private static readonly IReadOnlySet<short> EmptyHandlerOpCodes = new[]
@@ -491,6 +512,28 @@ namespace CoveredLot.Shared
                 found.AddRange(Instructions(methodHandle)
                     .Where(instruction => instruction.OpCode == OpCodes.Initobj)
                     .Select(instruction => new DefaultedStruct { Location = At(method, instruction.Offset), TypeName = ShapeOf(instruction.Operand).DefinitionName }));
+            }
+
+            return found;
+        }
+
+        /// <summary>
+        /// Every overflow-checked addition, subtraction and multiplication (add.ovf, sub.ovf, mul.ovf and their .un forms)
+        /// in every method body, with its location. The compiler writes these for integer arithmetic in a checked context
+        /// only: inside checked(...) or a checked block, or anywhere in an assembly built with overflow checks
+        /// (CheckForOverflowUnderflow in MSBuild, -checked+ in a csc.rsp). Where no source opens a checked context of its
+        /// own, finding one shows that the build checked overflow; the plain add and sub the compiler writes for its own
+        /// lowering, whatever the setting, are not listed.
+        /// </summary>
+        public IReadOnlyList<LocatedInstruction> OverflowCheckedArithmetic()
+        {
+            var found = new List<LocatedInstruction>();
+            foreach (MethodDefinitionHandle methodHandle in AllMethods())
+            {
+                string method = Describe(methodHandle);
+                found.AddRange(Instructions(methodHandle)
+                    .Where(instruction => OverflowCheckedArithmeticOpCodes.Contains(instruction.OpCode.Value))
+                    .Select(instruction => new LocatedInstruction { Location = At(method, instruction.Offset), OpCodeName = instruction.OpCode.Name ?? string.Empty }));
             }
 
             return found;

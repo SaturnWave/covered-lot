@@ -11,8 +11,10 @@ namespace CoveredLot.UnityChecks
     /// generic or bare catch block, with or without a when-filter, an empty catch block, or a type reference to
     /// System.Random or UnityEngine.Random; Core, the Client and the Editor have no async state machine, which holds a
     /// compiler-written generic catch; and Core has no catch block at all and no static field that can be reassigned. A
-    /// catch of a specific type with a when-filter passes outside Core. CoveredLot.Core.Tests shows each rule on planted
-    /// samples (HygieneTests there); these apply them to Unity's compiler output.
+    /// catch of a specific type with a when-filter passes outside Core. Unity's build of Core also holds overflow-checked
+    /// arithmetic (add.ovf, sub.ovf or mul.ovf), which shows that Unity applied the -checked+ of Core's csc.rsp: no Core
+    /// source opens a checked context of its own (CoveredLot.Core.Tests checks the sources). CoveredLot.Core.Tests shows
+    /// each rule on planted samples (HygieneTests there); these apply them to Unity's compiler output.
     /// </summary>
     public sealed class HygieneTests
     {
@@ -57,6 +59,17 @@ namespace CoveredLot.UnityChecks
             using AssemblyScanner core = UnityOutputs.Scan(Core);
 
             AssertNone(Core, core.CatchBlocks());
+        }
+
+        [Fact]
+        public void Core_holds_overflow_checked_arithmetic_so_Unity_applied_its_checked_option()
+        {
+            using AssemblyScanner core = UnityOutputs.Scan(Core);
+
+            IReadOnlyList<LocatedInstruction> found = core.OverflowCheckedArithmetic();
+
+            Assert.True(found.Count > 0, "Unity's build of " + Core
+                + " holds no add.ovf, sub.ovf or mul.ovf, so Unity built it without the -checked+ of Assets/CoveredLot/Core/csc.rsp.");
         }
 
         [Fact]

@@ -1,69 +1,101 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using CoveredLot.Core;
+using CoveredLot.Core.Catalogue;
 using CoveredLot.Tests.Support;
 using NUnit.Framework;
 using PuzzleCore;
 using PuzzleCore.Jam;
 using PuzzleCore.Packs;
 using PuzzleCore.Play;
+using PuzzleCore.Records;
 using PuzzleCore.Rules;
 using UnityEngine;
 
 namespace CoveredLot.Tests.EditMode
 {
     /// <summary>
-    /// The engine and the shipped level texts inside Unity's runtime (design section 10.3), as the .NET tests check them on
-    /// .NET: presentation.json, every level it lists and the Example load from Resources as text assets, and read and load
-    /// through the engine DLLs the game ships; writing each level back gives its asset text exactly; every listed level has
-    /// its presentation fingerprint; and the Example's known answers hold through the engine's Attempt in Campaign mode.
-    /// The counts are asserted, so the checks cannot pass on an empty list. Core has no catalogue or session yet: pieces 4
-    /// and 5 move these checks onto LevelCatalogue and GameSession.
+    /// Core's level catalogue inside Unity's runtime (design section 10.3), under the culture the run names, as the .NET
+    /// tests check it on .NET. A test-only host gives LevelCatalogue.Load the texts that Resources holds, each loaded as a
+    /// TextAsset by its Resources path and unloaded after reading, and the catalogue gives Ready: the Example first with
+    /// par 3, then Level 1 to 98 in the order presentation.json lists them, each with the slot and the par that file gives.
+    /// Each level it loaded writes back to its asset's text, and each listed level has its presentation fingerprint. The
+    /// Example's known answers hold through the engine's Attempt in Campaign mode, on the catalogue's Example, until piece 5
+    /// moves them onto GameSession. A level text that Resources lacks gives Broken with Copy's development line for it. The
+    /// counts are asserted, so no check can pass on an empty list.
     /// </summary>
     [HostileCulture]
     public sealed class CoreInUnityTests
     {
         /// <summary>The folder under Resources that holds the level texts (Assets/Generated/Resources/Levels).</summary>
         private const string LevelsFolder = "Levels";
-        private const string PresentationName = "presentation";
-        private const string ExampleName = "six-by-six";
+        private const string PresentationAsset = "presentation";
+        private const string ExampleAsset = "six-by-six";
 
         /// <summary>The levels engine-sync.txt records for the synced commit; a sync that changes the count changes this.</summary>
         private const int ListedLevelCount = 98;
 
-        [Test]
-        public void Every_listed_level_and_the_example_load_and_write_back_to_their_asset_text()
-        {
-            IReadOnlyList<string> names = ListedLevels().Select(level => level.Level.Value).Append(ExampleName).ToList();
-            var differing = new List<string>();
-            foreach (string name in names)
-            {
-                LevelAsset asset = LevelAsset.Read(name);
-                if (LotText.Write(Loaded(asset)) != asset.Text)
-                {
-                    differing.Add(name);
-                }
-            }
+        /// <summary>The par the engine's solver finds for the Example, the brief's 6x6 board, as the .NET tests pin it.</summary>
+        private const int ExamplePeakPar = 3;
 
-            Assert.That(names.Count, Is.EqualTo(ListedLevelCount + 1), "the listed levels and the Example");
-            Assert.That(differing, Is.Empty, "LotText.Write gives another text than the asset for these levels");
+        [Test]
+        public void The_catalogue_loads_from_Resources_with_the_Example_first_then_each_listed_level_numbered_in_file_order_with_its_slot_and_par()
+        {
+            IReadOnlyList<PresentationLevel> listed = ListedLevels();
+
+            IReadOnlyList<CatalogueEntry> entries = EntriesOf(LevelCatalogue.Load(new ResourcesTexts()));
+
+            var expected = new List<string> { "Example, no slot, par " + Number(ExamplePeakPar) };
+            expected.AddRange(listed.Select((level, position) =>
+                "Level " + Number(position + 1) + ", slot " + Number(level.Slot.Value) + ", par " + Number(ParOf(level))));
+            Assert.That(listed.Count, Is.EqualTo(ListedLevelCount), "the levels presentation.json lists");
+            Assert.That(entries.Select(Row).ToList(), Is.EqualTo(expected), "the catalogue's entries");
         }
 
         [Test]
-        public void Every_listed_level_has_the_fingerprint_its_presentation_entry_gives()
+        public void Each_level_of_the_catalogue_writes_back_to_its_asset_text()
+        {
+            IReadOnlyList<string> assets = new[] { ExampleAsset }.Concat(ListedLevels().Select(level => level.Level.Value)).ToList();
+
+            IReadOnlyList<CatalogueEntry> entries = EntriesOf(LevelCatalogue.Load(new ResourcesTexts()));
+
+            Assert.That(entries.Count, Is.EqualTo(ListedLevelCount + 1), "the catalogue's entries: the Example and the listed levels");
+            Assert.That(assets.Count, Is.EqualTo(entries.Count), "the asset texts to compare");
+            IReadOnlyList<string> differing = assets.Where((asset, index) => LotText.Write(entries[index].Level) != AssetText(asset)).ToList();
+            Assert.That(differing, Is.Empty, "LotText.Write gives another text than the asset for these entries");
+        }
+
+        [Test]
+        public void Each_listed_level_of_the_catalogue_has_the_fingerprint_its_presentation_entry_gives()
         {
             IReadOnlyList<PresentationLevel> listed = ListedLevels();
-            var mismatched = new List<string>();
-            foreach (PresentationLevel entry in listed)
-            {
-                if (LotText.Fingerprint(Loaded(LevelAsset.Read(entry.Level.Value))) != entry.Fingerprint.Hex)
-                {
-                    mismatched.Add(entry.Level.Value);
-                }
-            }
+
+            IReadOnlyList<CatalogueEntry> entries = EntriesOf(LevelCatalogue.Load(new ResourcesTexts()));
 
             Assert.That(listed.Count, Is.EqualTo(ListedLevelCount), "the levels presentation.json lists");
+            Assert.That(entries.Count, Is.EqualTo(listed.Count + 1), "the catalogue's entries: the Example and the listed levels");
+            IReadOnlyList<string> mismatched = listed
+                .Where((level, position) => LotText.Fingerprint(entries[position + 1].Level) != level.Fingerprint.Hex)
+                .Select(level => level.Level.Value)
+                .ToList();
             Assert.That(mismatched, Is.Empty, "these levels' fingerprints differ from presentation.json's");
+        }
+
+        [Test]
+        public void A_level_text_that_Resources_lacks_gives_Broken_with_its_development_line()
+        {
+            PresentationLevel hidden = ListedLevels()[3];
+
+            CatalogueResult result = LevelCatalogue.Load(new ResourcesTextsWithout(hidden.Level));
+
+            Assert.That(hidden.Slot.Value, Is.EqualTo(3), "the slot of the fourth level presentation.json lists");
+            if (!(result is CatalogueResult.Broken broken))
+            {
+                throw new AssertionException("The catalogue loaded without the text of " + hidden.Level.Value + ".");
+            }
+
+            Assert.That(broken.Problems.Select(Copy.ProblemLine).ToList(), Is.EqualTo(new[] { "slot 0003: text missing" }), "the development lines");
         }
 
         [Test]
@@ -103,48 +135,68 @@ namespace CoveredLot.Tests.EditMode
             Assert.That(attempt.Outcome, Is.EqualTo(new Outcome.Failed(FailKind.SlotsFull)), "the outcome after the four taps");
         }
 
-        /// <summary>The text of the TextAsset Resources holds under Levels/<paramref name="name"/>, as the game reads it, unloaded after reading.</summary>
-        private static string AssetText(string name)
+        /// <summary>The text of the TextAsset Resources holds under Levels/<paramref name="asset"/>, read apart from the catalogue's host.</summary>
+        private static string AssetText(string asset)
         {
-            string path = LevelsFolder + "/" + name;
-            TextAsset? asset = Resources.Load<TextAsset>(path);
-            if (asset == null)
+            string path = LevelsFolder + "/" + asset;
+            TextAsset? loaded = Resources.Load<TextAsset>(path);
+            if (loaded == null)
             {
                 throw new AssertionException("Resources holds no text asset at " + path + ".");
             }
 
             try
             {
-                return asset.text;
+                return loaded.text;
             }
             finally
             {
-                Resources.UnloadAsset(asset);
+                Resources.UnloadAsset(loaded);
             }
         }
 
+        /// <summary>The levels presentation.json lists, read by the engine's reader from the asset, apart from the catalogue.</summary>
         private static IReadOnlyList<PresentationLevel> ListedLevels() =>
-            PresentationJson.Read(AssetText(PresentationName)) switch
+            PresentationJson.Read(AssetText(PresentationAsset)) switch
             {
                 PresentationReadResult.Read read => read.File.Levels,
-                var unreadable => throw new AssertionException(PresentationName + " does not read: " + unreadable),
+                var unreadable => throw new AssertionException(PresentationAsset + " does not read: " + unreadable),
             };
 
-        private static LotLevel Loaded(LevelAsset asset)
+        private static int ParOf(PresentationLevel level) =>
+            level.Grade.Plan.PeakPar.TryGet(out CapacityCount par)
+                ? par.Value
+                : throw new AssertionException(level.Level.Value + " has no par in " + PresentationAsset + ".");
+
+        private static IReadOnlyList<CatalogueEntry> EntriesOf(CatalogueResult result) => result switch
         {
-            LotDefinition definition = LotText.Read(asset.Text) switch
-            {
-                LotTextResult.Read read => read.Definition,
-                var malformed => throw new AssertionException(asset.Name + " is not a pc-lot text: " + malformed),
-            };
-            return LotLoader.Load(definition) switch
-            {
-                LoadResult.Loaded loaded => loaded.Level,
-                var rejected => throw new AssertionException(asset.Name + " is refused by LotLoader: " + rejected),
-            };
-        }
+            CatalogueResult.Ready ready => ready.Entries,
+            CatalogueResult.Broken broken => throw new AssertionException(
+                "The catalogue is broken: " + string.Join("; ", broken.Problems.Select(Copy.ProblemLine)) + "."),
+            _ => throw new AssertionException("The catalogue gave a result of the unknown kind " + result.GetType().Name + "."),
+        };
 
-        private static JamRules ExampleRules() => new JamRules(Loaded(LevelAsset.Read(ExampleName)));
+        /// <summary>"Example, no slot, par 3", or "Level 1, slot 0, par 3".</summary>
+        private static string Row(CatalogueEntry entry) =>
+            TitleOf(entry.Title) + ", " + (entry.Slot.TryGet(out LevelIndex slot) ? "slot " + Number(slot.Value) : "no slot")
+            + ", par " + Number(entry.PeakPar.Bays.Value);
+
+        private static string TitleOf(EntryTitle title) => title switch
+        {
+            EntryTitle.Example => "Example",
+            EntryTitle.Numbered numbered => "Level " + Number(numbered.Number.Value),
+            _ => throw new AssertionException("An entry has a title of the unknown kind " + title.GetType().Name + "."),
+        };
+
+        private static string Number(int value) => value.ToString(CultureInfo.InvariantCulture);
+
+        /// <summary>The rules of the catalogue's first entry, which must be the Example.</summary>
+        private static JamRules ExampleRules()
+        {
+            CatalogueEntry first = EntriesOf(LevelCatalogue.Load(new ResourcesTexts()))[0];
+            Assert.That(first.Title, Is.InstanceOf<EntryTitle.Example>(), "the title of the catalogue's first entry");
+            return new JamRules(first.Level);
+        }
 
         /// <summary>UnityEngine has a PlayMode of its own (the legacy Animation's), so the engine's is named in full.</summary>
         private static Attempt<LotState, Exit, ExitRejection> CampaignAttempt(JamRules rules) =>
@@ -166,20 +218,42 @@ namespace CoveredLot.Tests.EditMode
             return notDone;
         }
 
-        /// <summary>A level's text as Resources holds it under Levels, with the name it was read by.</summary>
-        private sealed class LevelAsset
+        /// <summary>
+        /// The level texts as Unity's Resources hold them, a test-only host such as the Client's will be (piece 11): each text
+        /// is loaded as a TextAsset by its Resources path, a missing asset gives None, and the asset is unloaded once its text
+        /// is read.
+        /// </summary>
+        private sealed class ResourcesTexts : ILevelTexts
         {
-            private LevelAsset(string name, string text)
+            public Option<string> Read(LevelTextName name)
             {
-                Name = name;
-                Text = text;
+                TextAsset? asset = Resources.Load<TextAsset>(name.ResourcesPath);
+                if (asset == null)
+                {
+                    return Option.None<string>();
+                }
+
+                try
+                {
+                    return Option.Some(asset.text);
+                }
+                finally
+                {
+                    Resources.UnloadAsset(asset);
+                }
             }
+        }
 
-            public string Name { get; }
+        /// <summary>The texts Resources holds, but for the one level's, which this host lacks.</summary>
+        private sealed class ResourcesTextsWithout : ILevelTexts
+        {
+            private readonly ILevelTexts _texts = new ResourcesTexts();
+            private readonly LevelId _lacking;
 
-            public string Text { get; }
+            public ResourcesTextsWithout(LevelId lacking) => _lacking = lacking;
 
-            public static LevelAsset Read(string name) => new LevelAsset(name, AssetText(name));
+            public Option<string> Read(LevelTextName name) =>
+                name is LevelTextName.Level level && level.Id == _lacking ? Option.None<string>() : _texts.Read(name);
         }
     }
 }

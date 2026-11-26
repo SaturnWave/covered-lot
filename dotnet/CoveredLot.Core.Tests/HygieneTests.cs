@@ -17,11 +17,14 @@ namespace CoveredLot.Core.Tests
     /// self-tests prove that the scanner sees each planted form in the samples compiled into this assembly and stays
     /// silent on the clean sample, as the engine's guard tests do.
     ///
-    /// Overflow is checked on the sources instead. Core compiles with overflow checks on (CheckForOverflowUnderflow in
-    /// the .NET build and -checked+ in Unity, both pinned), so the integer arithmetic and numeric conversions it writes
-    /// can wrap only inside an unchecked context, and no Core source may open one. The IL cannot show this: the
-    /// compiler's own lowering of a foreach over an array, of a switch over an enum that starts at 1 or of an index
-    /// from the end emits a plain add or sub that cannot overflow.
+    /// Overflow is checked on the sources and on the IL. Core compiles with overflow checks on (CheckForOverflowUnderflow
+    /// in the .NET build and -checked+ in Unity, both pinned), so the integer arithmetic and numeric conversions it writes
+    /// can wrap only inside an unchecked context, and no Core source may open one. That none wraps cannot be read from the
+    /// IL: the compiler's own lowering of a foreach over an array, of a switch over an enum that starts at 1 or of an index
+    /// from the end emits a plain add or sub that cannot overflow. What the IL shows is that the build checked overflow:
+    /// the .NET build of Core holds overflow-checked arithmetic (add.ovf, sub.ovf or mul.ovf), and no Core source opens a
+    /// checked context of its own, where the compiler would write it whatever the build's setting. UnityChecks scans
+    /// Unity's build of Core in the same way.
     ///
     /// Culture-sensitive string comparison is checked on the sources too. The API policy (ApiPolicyTests) lets a string
     /// member through whenever it takes a StringComparison, whatever value it is given, and the analyzers flag such a
@@ -37,6 +40,7 @@ namespace CoveredLot.Core.Tests
         private const string AsyncSample = Samples + "AsyncSample";
         private const string MutableStaticSample = Samples + "MutableStaticSample";
         private const string CleanSample = Samples + "CleanSample";
+        private const string OverflowSamples = Samples + "OverflowSamples";
         private const string CoreFolder = "Assets/CoveredLot/Core";
 
         /// <summary>
@@ -44,6 +48,13 @@ namespace CoveredLot.Core.Tests
         /// from code takes a C# lexer, and Core's comments and copy can say it another way.
         /// </summary>
         private static readonly Regex UncheckedKeyword = new(@"\bunchecked\b", RegexOptions.CultureInvariant);
+
+        /// <summary>
+        /// The keyword checked opening a context: before a parenthesis, checked(...), or a brace, a checked block. Like the
+        /// unchecked rule it reads text, so it matches in comments and strings too: prose such as "overflow-checked" matches
+        /// when a parenthesis or a brace follows it, and passes otherwise.
+        /// </summary>
+        private static readonly Regex CheckedContext = new(@"\bchecked\s*[({]", RegexOptions.CultureInvariant);
 
         /// <summary>A StringComparison value that compares by a culture's rules, qualified or not by its namespace.</summary>
         private static readonly Regex CultureSensitiveComparison = new(
@@ -110,6 +121,77 @@ namespace CoveredLot.Core.Tests
             Assert.NotEmpty(sources);
             Assert.True(uncheckedLines.Count == 0,
                 "Core keeps its overflow checks; these lines name unchecked:\n" + string.Join("\n", uncheckedLines));
+        }
+
+        [Fact]
+        public void The_dotnet_build_of_Core_holds_overflow_checked_arithmetic_so_it_was_built_with_overflow_checks()
+        {
+            using var core = CoreScanner();
+
+            IReadOnlyList<LocatedInstruction> found = core.OverflowCheckedArithmetic();
+
+            Assert.True(found.Count > 0,
+                "The .NET build of CoveredLot.Core holds no add.ovf, sub.ovf or mul.ovf, so it was built without overflow checks (CheckForOverflowUnderflow).");
+        }
+
+        [Fact]
+        public void No_Core_source_opens_a_checked_context_of_its_own()
+        {
+            IReadOnlyList<string> sources = CoreSources();
+
+            IReadOnlyList<string> checkedLines = sources.SelectMany(source => LinesMatching(source, CheckedContext)).ToList();
+
+            Assert.NotEmpty(sources);
+            Assert.True(checkedLines.Count == 0,
+                "Core leaves overflow checks to its build, so that its IL shows the build's setting; these lines open a checked context:\n"
+                + string.Join("\n", checkedLines));
+        }
+
+        [Theory]
+        [InlineData("int sum = checked(first + second);")]
+        [InlineData("checked { total *= step; }")]
+        [InlineData("long wide = checked (value * 2);")]
+        public void The_source_scan_reports_each_planted_checked_context(string line)
+        {
+            Assert.Matches(CheckedContext, line);
+        }
+
+        [Theory]
+        [InlineData("int sum = unchecked(first + second);")]
+        [InlineData("// The arithmetic stays overflow-checked.")]
+        [InlineData("bool isChecked = box.Checked;")]
+        public void The_source_scan_passes_unchecked_contexts_prose_and_longer_words(string line)
+        {
+            Assert.DoesNotMatch(CheckedContext, line);
+        }
+
+        [Theory]
+        [InlineData("Next", "add.ovf")]
+        [InlineData("NextUnsigned", "add.ovf.un")]
+        [InlineData("Previous", "sub.ovf")]
+        [InlineData("PreviousUnsigned", "sub.ovf.un")]
+        [InlineData("Doubled", "mul.ovf")]
+        [InlineData("DoubledUnsigned", "mul.ovf.un")]
+        public void The_scanner_reports_each_planted_overflow_checked_instruction(string method, string opCode)
+        {
+            using var samples = SampleScanner();
+
+            IReadOnlyList<LocatedInstruction> found = samples.OverflowCheckedArithmetic();
+
+            LocatedInstruction planted = Assert.Single(found, instruction => IsInMethod(instruction.Location, OverflowSamples, method));
+            Assert.Equal(opCode, planted.OpCodeName);
+        }
+
+        [Fact]
+        public void The_scanner_reports_no_overflow_checked_instruction_for_unchecked_arithmetic()
+        {
+            using var samples = SampleScanner();
+
+            IReadOnlyList<LocatedInstruction> found = samples.OverflowCheckedArithmetic();
+
+            // The scan read the sample type: its checked addition is reported.
+            Assert.Contains(found, instruction => IsInMethod(instruction.Location, OverflowSamples, "Next"));
+            Assert.DoesNotContain(found, instruction => IsInMethod(instruction.Location, OverflowSamples, "NextWrapping"));
         }
 
         [Fact]
@@ -256,6 +338,10 @@ namespace CoveredLot.Core.Tests
             .Select((text, index) => (Text: text, Number: index + 1))
             .Where(line => pattern.IsMatch(line.Text))
             .Select(line => RepositoryLayout.Relative(source) + ":" + line.Number.ToString(CultureInfo.InvariantCulture));
+
+        /// <summary>Whether a location ("Type::Method+IL_0004") lies in that method of that type, and not in one whose name only starts the same.</summary>
+        private static bool IsInMethod(string location, string type, string method) =>
+            location.StartsWith(type + "::" + method + "+IL_", StringComparison.Ordinal);
 
         /// <summary>Whether a location or type name lies in the type or in a type nested in it (a state machine, a closure).</summary>
         private static bool IsIn(string location, string type) =>
