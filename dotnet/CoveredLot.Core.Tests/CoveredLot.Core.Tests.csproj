@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Tests of the Unity-free Core and of the repository's guards. tools/check-dotnet.sh runs them in tr-TR and
+       in sv-SE; PUZZLE_TEST_CULTURE is required. The shared assembly scanner and its planted samples are
+       compiled in, so the scanner's self-tests read this assembly, as the engine's do. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>CoveredLot.Core.Tests</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\CoveredLot.Core\CoveredLot.Core.csproj" />
+  </ItemGroup>
+  <!-- The tests also call the engine themselves, on the same shipped DLLs that Core is built against. -->
+  <ItemGroup>
+    <Reference Include="PuzzleCore">
+      <HintPath>..\..\Assets\Generated\PuzzleCore\PuzzleCore.dll</HintPath>
+    </Reference>
+    <Reference Include="PuzzleCore.Jam">
+      <HintPath>..\..\Assets\Generated\PuzzleCore\PuzzleCore.Jam.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\Shared\**\*.cs" Link="Shared\%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

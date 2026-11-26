@@ -39,3 +39,16 @@ Run these from the repository root in Git Bash:
 - `tools/scan-before-push.sh` runs before every push. The repository is public, so it
   refuses to pass any secret, personal path, user name or non-noreply email in the commits
   a push would publish. `tools/scan-self-test.sh` proves it catches each kind.
+
+## .NET checks
+
+`tools/check-dotnet.sh` needs the .NET SDK that `dotnet/global.json` pins, and no Unity
+editor. It builds `dotnet/CoveredLot.Core`, the .NET build of the files Unity compiles from
+`Assets/CoveredLot/Core`, against the engine DLLs in `Assets/Generated`, and runs
+`dotnet/CoveredLot.Core.Tests` in Release twice: under tr-TR, then under sv-SE. The tests
+check the culture guard; the compiled Core (no generic, bare, filtered or empty catch, no
+`System.Random` or `UnityEngine.Random`, no async, no unchecked arithmetic); the asmdef and
+`csc.rsp` rules; `Assets/Generated` against its checksums and record; and every shipped
+level text. The script fails if either run fails or runs no test, and writes TRX results to
+`artifacts/local/dotnet/<culture>/`. To run the tests by hand, set `PUZZLE_TEST_CULTURE` to
+`tr-TR` or `sv-SE` first; without it they fail.

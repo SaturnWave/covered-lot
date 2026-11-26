@@ -1,0 +1,17 @@
+{
+    "name": "CoveredLot.Core",
+    "rootNamespace": "CoveredLot.Core",
+    "references": [],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "PuzzleCore.dll",
+        "PuzzleCore.Jam.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": true
+}

@@ -1,0 +1,33 @@
+<Project>
+  <!--
+    Build settings for the .NET projects under dotnet/, ported from the engine's
+    Directory.Build.props (SaturnWave/puzzle-engine). They live here and not at the repository
+    root, because Unity writes its own .csproj files at the root and those would import a root
+    Directory.Build.props. Directory.Build.targets checks the evaluated values at build time.
+    InvariantGlobalization is deliberately not set: it silences the culture analyzers
+    (CA1304/CA1305/CA1307/CA1309/CA1310/CA1311).
+  -->
+  <PropertyGroup>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <Deterministic>true</Deterministic>
+    <!-- Integer overflow throws instead of wrapping. Unity gets the same from Core's csc.rsp (-checked+). -->
+    <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
+    <!-- Pinned with the SDK (global.json, rollForward=disable) so analyzer rules only change on purpose. -->
+    <AnalysisLevel>10.0-recommended</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <!-- Build output must not carry the checkout path. The repository root is mapped, not this
+         folder, because the Core sources live under Assets/. -->
+    <PathMap>$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)..'))=/_/</PathMap>
+    <EnableSourceLink>false</EnableSourceLink>
+    <EnableSourceControlManagerQueries>false</EnableSourceControlManagerQueries>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <!-- Unity 6.3 compiles the same Core sources with C# 9, so the .NET build accepts nothing newer. -->
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'CoveredLot.Core'">
+    <LangVersion>9.0</LangVersion>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,34 @@
+<Project>
+  <!--
+    Build-time guard: a trimmed port of the engine's PUZZLE001 check (SaturnWave/puzzle-engine,
+    Directory.Build.targets). It runs before every compile and checks EVALUATED values, so a
+    property set in any props/targets/rsp file, on the command line or in a project file is seen
+    the way the compiler sees it. The engine's layering table is left out: this repository has
+    one source project, the Unity-free CoveredLot.Core.
+  -->
+  <PropertyGroup>
+    <PuzzleIsUnityBound>false</PuzzleIsUnityBound>
+    <PuzzleIsUnityBound Condition="'$(MSBuildProjectName)' == 'CoveredLot.Core'">true</PuzzleIsUnityBound>
+  </PropertyGroup>
+
+  <Target Name="PuzzleGuardProjectRules" BeforeTargets="CoreCompile">
+    <PropertyGroup>
+      <!-- Rules for every project (Core and tests). -->
+      <_PuzzleProblems Condition="'$(TreatWarningsAsErrors)' != 'true'">$(_PuzzleProblems) TreatWarningsAsErrors must be true;</_PuzzleProblems>
+      <_PuzzleProblems Condition="'$(Nullable)' != 'enable'">$(_PuzzleProblems) Nullable must be enable (is '$(Nullable)');</_PuzzleProblems>
+      <_PuzzleProblems Condition="'$(CheckForOverflowUnderflow)' != 'true'">$(_PuzzleProblems) CheckForOverflowUnderflow must be true;</_PuzzleProblems>
+      <_PuzzleProblems Condition="'$(InvariantGlobalization)' == 'true'">$(_PuzzleProblems) InvariantGlobalization must not be true (it silences the culture analyzers);</_PuzzleProblems>
+      <_PuzzleProblems Condition="'$(AllowUnsafeBlocks)' == 'true'">$(_PuzzleProblems) AllowUnsafeBlocks must not be true;</_PuzzleProblems>
+      <_PuzzleProblems Condition="'$(NoWarn)' != '1701;1702' and '$(NoWarn)' != ''">$(_PuzzleProblems) NoWarn must stay at the SDK default '1701;1702' (is '$(NoWarn)');</_PuzzleProblems>
+      <_PuzzleProblems Condition="'$(WarningsNotAsErrors)' != ''">$(_PuzzleProblems) WarningsNotAsErrors must be empty (is '$(WarningsNotAsErrors)');</_PuzzleProblems>
+
+      <!-- The Unity-free Core, which Unity compiles from the same files. -->
+      <_PuzzleProblems Condition="'$(PuzzleIsUnityBound)' == 'true' and '$(TargetFramework)' != 'netstandard2.1'">$(_PuzzleProblems) TargetFramework must be netstandard2.1 (is '$(TargetFramework)');</_PuzzleProblems>
+      <_PuzzleProblems Condition="'$(PuzzleIsUnityBound)' == 'true' and '$(LangVersion)' != '9.0'">$(_PuzzleProblems) LangVersion must be 9.0 (is '$(LangVersion)');</_PuzzleProblems>
+      <_PuzzleProblems Condition="'$(PuzzleIsUnityBound)' == 'true' and '@(PackageReference)' != ''">$(_PuzzleProblems) no package references allowed (found: @(PackageReference));</_PuzzleProblems>
+    </PropertyGroup>
+
+    <Error Condition="'$(_PuzzleProblems)' != ''" Code="PUZZLE001"
+           Text="$(MSBuildProjectName) breaks the build rules of dotnet/Directory.Build.targets:$(_PuzzleProblems)" />
+  </Target>
+</Project>

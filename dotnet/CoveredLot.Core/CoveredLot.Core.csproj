@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The Unity-free Core, built by .NET from the same files Unity compiles (Assets/CoveredLot/Core),
+       against the engine DLLs the game ships (Assets/Generated/PuzzleCore), so every test runs on the
+       shipped bytes. netstandard2.1 and C# 9 (../Directory.Build.props), no packages. -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\..\Assets\CoveredLot\Core\**\*.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="PuzzleCore">
+      <HintPath>..\..\Assets\Generated\PuzzleCore\PuzzleCore.dll</HintPath>
+    </Reference>
+    <Reference Include="PuzzleCore.Jam">
+      <HintPath>..\..\Assets\Generated\PuzzleCore\PuzzleCore.Jam.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+</Project>
