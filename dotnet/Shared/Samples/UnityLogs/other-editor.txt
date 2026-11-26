@@ -1,0 +1,5 @@
+Doctored for UnityEditorLogTests, in the form of lines from a Unity editor log: a finished run of another editor than the one the project pins.
+Built from '6000.3/staging' branch; Version is '6000.3.30f1 (0123456789ab) revision 1234567'; Using compiler version '194234433'; Build Type 'Release'
+[571/722    2s] Csc Library/Bee/artifacts/0123abcd.dag/CoveredLot.Core.dll (+2 others)
+*** Tundra build success (3.17 seconds), 21 items updated, 722 evaluated
+Test run completed. Exiting with code 0 (Ok). Run completed.

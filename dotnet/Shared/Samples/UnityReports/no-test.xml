@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Doctored for UnityTestReportTests: a run whose filter matched no test, which the editor still ends with exit code 0. -->
+<!-- Doctored for UnityTestReportTests: a run whose filter matched no test, which the editor still ends with exit code 0. As in a real run, the report then holds no test assembly at all. -->
 <test-run id="2" testcasecount="0" result="Passed" total="0" passed="0" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-11-26 12:00:00Z" end-time="2026-11-26 12:00:00Z" duration="0.0">
-  <test-suite type="TestSuite" id="1000" name="covered-lot" fullname="covered-lot" runstate="Runnable" testcasecount="0" result="Passed" total="0" passed="0" failed="0" inconclusive="0" skipped="0" asserts="0" />
+  <test-suite type="TestSuite" id="1000" name="Covered Lot" fullname="Covered Lot" runstate="Runnable" testcasecount="0" result="Passed" total="0" passed="0" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="EditMode" />
+    </properties>
+  </test-suite>
 </test-run>

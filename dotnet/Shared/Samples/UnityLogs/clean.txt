@@ -1,8 +1,23 @@
-Doctored for UnityEditorLogTests, in the form of lines from a Unity editor log: the compiler warns, but never about our code.
+Doctored for UnityEditorLogTests, in the form of lines from a Unity editor log: a finished run that compiles every CoveredLot assembly; the compiler warns, but never about our code.
+Built from '6000.3/staging' branch; Version is '6000.3.29f1 (0123456789ab) revision 1234567'; Using compiler version '194234433'; Build Type 'Release'
 [ScriptCompilation] Requested script compilation because: Assetdatabase observed changes in script compilation related files
+[480/722    3s] Csc Library/Bee/artifacts/0123abcd.dag/Unity.RenderPipelines.Core.Runtime.dll (+2 others)
 Library/PackageCache/com.unity.render-pipelines.core@0123456789ab/Runtime/Volume/VolumeManager.cs(120,17): warning CS0618: 'Example.Old' is obsolete: 'Use Example.New instead.'
+[481/722    3s] Csc Library/Bee/artifacts/0123abcd.dag/Unity.InputSystem.dll (+2 others)
 Library/PackageCache/com.unity.inputsystem@0123456789ab/InputSystem/Example.cs(42,13): warning CS0168: The variable 'unused' is declared but never used
+[482/722    1s] Csc Library/Bee/artifacts/0123abcd.dag/ThirdParty.Plugin.dll (+2 others)
 Assets/ThirdParty/Plugin/Example.cs(7,9): warning CS0219: The variable 'value' is assigned but its value is never used
+[BUSY       6s] Csc Library/Bee/artifacts/0123abcd.dag/CoveredLot.Core.dll (+2 others)
+[571/722    6s] Csc Library/Bee/artifacts/0123abcd.dag/CoveredLot.Core.dll (+2 others)
+[572/722    2s] Csc Library/Bee/artifacts/0123abcd.dag/CoveredLot.Client.dll (+2 others)
+[573/722    2s] Csc Library/Bee/artifacts/0123abcd.dag/CoveredLot.Editor.dll (+2 others)
+[574/722    2s] Csc Library/Bee/artifacts/0123abcd.dag/CoveredLot.Tests.Support.dll (+2 others)
+[575/722    2s] Csc Library/Bee/artifacts/0123abcd.dag/CoveredLot.Tests.EditMode.dll (+2 others)
+[576/722    2s] Csc Library/Bee/artifacts/0123abcd.dag/CoveredLot.Tests.PlayMode.dll (+2 others)
+[577/722    0s] CopyFiles Library/ScriptAssemblies/CoveredLot.Core.dll
+*** Tundra build success (3.17 seconds), 21 items updated, 722 evaluated
+Library/PackageCache/com.unity.inputsystem@0123456789ab/InputSystem/Example.cs(42,13): warning CS0168: The variable 'unused' is declared but never used
 Compiling Assets/CoveredLot/Client/CoveredLot.Client.asmdef and Assets/Tests/EditMode/CoveredLot.Tests.EditMode.asmdef
 Refreshing native plugins compatible for Editor in 0.42 ms. Found 0 plugins.
 Executing Assets/CoveredLot/Core tests: 0 warnings, 0 errors
+Test run completed. Exiting with code 0 (Ok). Run completed.

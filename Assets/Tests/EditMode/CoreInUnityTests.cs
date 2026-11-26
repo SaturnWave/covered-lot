@@ -38,8 +38,8 @@ namespace CoveredLot.Tests.EditMode
             var differing = new List<string>();
             foreach (string name in names)
             {
-                string text = AssetText(name);
-                if (LotText.Write(Loaded(name, text)) != text)
+                LevelAsset asset = LevelAsset.Read(name);
+                if (LotText.Write(Loaded(asset)) != asset.Text)
                 {
                     differing.Add(name);
                 }
@@ -53,11 +53,14 @@ namespace CoveredLot.Tests.EditMode
         public void Every_listed_level_has_the_fingerprint_its_presentation_entry_gives()
         {
             IReadOnlyList<PresentationLevel> listed = ListedLevels();
-
-            IReadOnlyList<string> mismatched = listed
-                .Where(entry => LotText.Fingerprint(Loaded(entry.Level.Value, AssetText(entry.Level.Value))) != entry.Fingerprint.Hex)
-                .Select(entry => entry.Level.Value)
-                .ToList();
+            var mismatched = new List<string>();
+            foreach (PresentationLevel entry in listed)
+            {
+                if (LotText.Fingerprint(Loaded(LevelAsset.Read(entry.Level.Value))) != entry.Fingerprint.Hex)
+                {
+                    mismatched.Add(entry.Level.Value);
+                }
+            }
 
             Assert.That(listed.Count, Is.EqualTo(ListedLevelCount), "the levels presentation.json lists");
             Assert.That(mismatched, Is.Empty, "these levels' fingerprints differ from presentation.json's");
@@ -110,9 +113,14 @@ namespace CoveredLot.Tests.EditMode
                 throw new AssertionException("Resources holds no text asset at " + path + ".");
             }
 
-            string text = asset.text;
-            Resources.UnloadAsset(asset);
-            return text;
+            try
+            {
+                return asset.text;
+            }
+            finally
+            {
+                Resources.UnloadAsset(asset);
+            }
         }
 
         private static IReadOnlyList<PresentationLevel> ListedLevels() =>
@@ -122,21 +130,21 @@ namespace CoveredLot.Tests.EditMode
                 var unreadable => throw new AssertionException(PresentationName + " does not read: " + unreadable),
             };
 
-        private static LotLevel Loaded(string name, string text)
+        private static LotLevel Loaded(LevelAsset asset)
         {
-            LotDefinition definition = LotText.Read(text) switch
+            LotDefinition definition = LotText.Read(asset.Text) switch
             {
                 LotTextResult.Read read => read.Definition,
-                var malformed => throw new AssertionException(name + " is not a pc-lot text: " + malformed),
+                var malformed => throw new AssertionException(asset.Name + " is not a pc-lot text: " + malformed),
             };
             return LotLoader.Load(definition) switch
             {
                 LoadResult.Loaded loaded => loaded.Level,
-                var rejected => throw new AssertionException(name + " is refused by LotLoader: " + rejected),
+                var rejected => throw new AssertionException(asset.Name + " is refused by LotLoader: " + rejected),
             };
         }
 
-        private static JamRules ExampleRules() => new JamRules(Loaded(ExampleName, AssetText(ExampleName)));
+        private static JamRules ExampleRules() => new JamRules(Loaded(LevelAsset.Read(ExampleName)));
 
         /// <summary>UnityEngine has a PlayMode of its own (the legacy Animation's), so the engine's is named in full.</summary>
         private static Attempt<LotState, Exit, ExitRejection> CampaignAttempt(JamRules rules) =>
@@ -156,6 +164,22 @@ namespace CoveredLot.Tests.EditMode
             }
 
             return notDone;
+        }
+
+        /// <summary>A level's text as Resources holds it under Levels, with the name it was read by.</summary>
+        private sealed class LevelAsset
+        {
+            private LevelAsset(string name, string text)
+            {
+                Name = name;
+                Text = text;
+            }
+
+            public string Name { get; }
+
+            public string Text { get; }
+
+            public static LevelAsset Read(string name) => new LevelAsset(name, AssetText(name));
         }
     }
 }

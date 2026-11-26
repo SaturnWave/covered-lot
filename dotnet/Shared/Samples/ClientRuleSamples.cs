@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
+using System.Text;
 using PuzzleCore;
 using PuzzleCore.Jam;
 using PuzzleCore.Play;
@@ -12,8 +14,8 @@ namespace CoveredLot.Shared.Samples
 {
     /// <summary>
     /// One use per method that the Client's own rules refuse (<see cref="ClientRules"/>): a member of each rules type, the
-    /// text of a floating-point number, a decimal and an integer whatever the provider, text built from values, and a colour
-    /// made each way C# makes one. The colours are the stand-ins of UnityStandIns.cs. Compiled into the test assembly only;
+    /// text of a floating-point number, a decimal and an integer whatever the provider, a number handed to a builder or a
+    /// writer, text built from values, and a colour made each way C# makes one. The colours are the stand-ins of UnityStandIns.cs. Compiled into the test assembly only;
     /// ClientRulesTests expects each method to be reported, and never runs it.
     /// </summary>
     internal static class ClientRuleSamples
@@ -49,6 +51,18 @@ namespace CoveredLot.Shared.Samples
 
         public static string ConvertedText(long bays) => Convert.ToString(bays, CultureInfo.InvariantCulture);
 
+        /// <summary>StringBuilder's Append of a float: the member bans refuse it of an integer or an object only.</summary>
+        public static string AppendedFloat(float bays) => new StringBuilder("bays ").Append(bays).ToString();
+
+        /// <summary>StringBuilder's Insert of a double, whose value comes after its Int32 index.</summary>
+        public static string InsertedDouble(double bays) => new StringBuilder(" bays").Insert(0, bays).ToString();
+
+        public static void WrittenDecimal(TextWriter writer, decimal bays) => writer.Write(bays);
+
+        public static void WrittenLineOfAFloat(TextWriter writer, float bays) => writer.WriteLine(bays);
+
+        public static void ConsoleWrittenDouble(double bays) => Console.Write(bays);
+
         public static Color NewColour() => new Color(1f, 0f, 0f, 1f);
 
         public static Color32 NewColour32() => new Color32(255, 0, 0, 255);
@@ -60,8 +74,9 @@ namespace CoveredLot.Shared.Samples
     }
 
     /// <summary>
-    /// Code of the kind the Client writes, which keeps every one of its rules: text joined from text, an ordinal comparison,
-    /// a colour passed on as it was given, and integer arithmetic. ClientRulesTests expects none of it to be reported.
+    /// Code of the kind the Client writes, which keeps every one of its rules: text joined from text, in a StringBuilder too,
+    /// an ordinal comparison, a colour passed on as it was given, and integer arithmetic. ClientRulesTests expects none of it
+    /// to be reported.
     /// </summary>
     internal static class CleanClientSample
     {
@@ -72,6 +87,9 @@ namespace CoveredLot.Shared.Samples
         public static bool IsTitle(string text) => string.Equals(text, Title, StringComparison.Ordinal);
 
         public static string Lines(IEnumerable<string> lines) => string.Join("\n", lines);
+
+        /// <summary>Text built from text: StringBuilder's Append of a char and Insert of a string at an Int32 index.</summary>
+        public static string Framed(string title) => new StringBuilder(title).Append(']').Insert(0, "[").ToString();
 
         /// <summary>A colour handed on, as a view hands a resolved style's colour to the painter: no colour is made.</summary>
         public static Color Stroke(Color resolved) => resolved;

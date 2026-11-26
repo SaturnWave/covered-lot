@@ -12,8 +12,9 @@ namespace CoveredLot.Tests.PlayMode
 {
     /// <summary>
     /// The Main scene in Play mode (design section 10.3): it loads by name, as Main is the one scene in the build, and once
-    /// it has loaded, the Game object's UIDocument shows the game's title, which GameRoot adds in Awake. The scene loads in
-    /// [UnitySetUp], inside [HostileCulture], so GameRoot runs under the test culture as well.
+    /// it has loaded, the Game object's UIDocument is attached to a panel, which it is only with its panel settings, and
+    /// holds one label, the game's title, which GameRoot adds in Awake. The scene loads in [UnitySetUp], inside
+    /// [HostileCulture], so GameRoot runs under the test culture as well.
     /// </summary>
     [HostileCulture]
     public sealed class MainSceneTests
@@ -28,7 +29,7 @@ namespace CoveredLot.Tests.PlayMode
         }
 
         [Test]
-        public void The_game_objects_document_holds_one_label_and_it_shows_the_game_title()
+        public void The_game_objects_document_is_on_a_panel_and_holds_one_label_the_game_title()
         {
             Assert.That(SceneManager.GetActiveScene().name, Is.EqualTo(MainScene), "the active scene");
             GameObject? game = GameObject.Find(GameObjectName);
@@ -45,6 +46,7 @@ namespace CoveredLot.Tests.PlayMode
 
             List<Label> labels = document.rootVisualElement.Query<Label>().ToList();
 
+            Assert.That(document.rootVisualElement.panel, Is.Not.Null, "the panel of the document's root, which only its panel settings give it");
             Assert.That(labels.Count, Is.EqualTo(1), "the labels under the document's root");
             Assert.That(labels[0].text, Is.EqualTo(Copy.GameTitle), "the label's text");
         }

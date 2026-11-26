@@ -14,7 +14,8 @@ namespace CoveredLot.Tests.Support
     /// variable is unset or names another culture; otherwise it saves the current, UI and default-thread cultures and
     /// applies the requested culture to all four. AfterTest puts back what BeforeTest saved; the test runner calls it even
     /// when BeforeTest failed, and then it has nothing to put back. Subclasses of a marked fixture inherit the attribute.
-    /// FixtureGuardTests checks that every fixture of the test assemblies carries it.
+    /// FixtureGuardTests checks that every fixture of the test assemblies carries it, and HostileCultureTests that it
+    /// applies the culture to all four and puts back each of the four it found.
     /// </summary>
     [AttributeUsage(AttributeTargets.Class, Inherited = true, AllowMultiple = false)]
     public sealed class HostileCultureAttribute : NUnitAttribute, IOuterUnityTestAction
@@ -25,7 +26,7 @@ namespace CoveredLot.Tests.Support
         public IEnumerator BeforeTest(ITest test)
         {
             CultureInfo requested = TestCulture.Required();
-            _saved = SavedCultures.OfThisThread();
+            _saved = new SavedCultures();
             CultureInfo.DefaultThreadCurrentCulture = requested;
             CultureInfo.DefaultThreadCurrentUICulture = requested;
             CultureInfo.CurrentCulture = requested;
@@ -44,24 +45,16 @@ namespace CoveredLot.Tests.Support
             yield break;
         }
 
-        /// <summary>The current, UI and default-thread cultures as one test found them; a default may be unset (null).</summary>
+        /// <summary>
+        /// The current, UI and default-thread cultures as this thread has them when it is made; a default may be unset
+        /// (null). Each field reads its own culture, so none can be stored in another's place.
+        /// </summary>
         private sealed class SavedCultures
         {
-            private readonly CultureInfo _current;
-            private readonly CultureInfo _currentUi;
-            private readonly CultureInfo? _defaultThread;
-            private readonly CultureInfo? _defaultThreadUi;
-
-            private SavedCultures(CultureInfo current, CultureInfo currentUi, CultureInfo? defaultThread, CultureInfo? defaultThreadUi)
-            {
-                _current = current;
-                _currentUi = currentUi;
-                _defaultThread = defaultThread;
-                _defaultThreadUi = defaultThreadUi;
-            }
-
-            public static SavedCultures OfThisThread() => new SavedCultures(
-                CultureInfo.CurrentCulture, CultureInfo.CurrentUICulture, CultureInfo.DefaultThreadCurrentCulture, CultureInfo.DefaultThreadCurrentUICulture);
+            private readonly CultureInfo _current = CultureInfo.CurrentCulture;
+            private readonly CultureInfo _currentUi = CultureInfo.CurrentUICulture;
+            private readonly CultureInfo? _defaultThread = CultureInfo.DefaultThreadCurrentCulture;
+            private readonly CultureInfo? _defaultThreadUi = CultureInfo.DefaultThreadCurrentUICulture;
 
             public void Restore()
             {

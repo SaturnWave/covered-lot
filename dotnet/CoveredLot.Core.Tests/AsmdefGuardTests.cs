@@ -22,7 +22,8 @@ namespace CoveredLot.Core.Tests
     /// assembly allows unsafe code, and every assembly of both folders carries its own csc.rsp, because a csc.rsp at the
     /// Assets root would apply to every package as well. Unity and the .NET build compile the same files into Core: the
     /// .NET build takes every .cs under Assets/CoveredLot/Core, so no other asmdef or asmref may move files in or out of
-    /// Core in Unity, and no source may sit where Unity does not import it.
+    /// Core in Unity, and no source may sit where Unity does not import it. And every C# source under Assets lies in the
+    /// folder of one of the six asmdefs, so Unity builds no Assembly-CSharp from a stray script.
     /// </summary>
     public sealed class AsmdefGuardTests
     {
@@ -216,6 +217,25 @@ namespace CoveredLot.Core.Tests
             IReadOnlyList<string> asmdefs = Sorted(FilesWithExtension(TestsFolder, ".asmdef").Select(path => RepositoryLayout.Relative(path)));
 
             Assert.Equal(Sorted(new[] { SupportAsmdef, EditModeAsmdef, PlayModeAsmdef }), asmdefs);
+        }
+
+        /// <summary>
+        /// Unity compiles a script outside every asmdef folder into Assembly-CSharp or Assembly-CSharp-Editor. Those carry no
+        /// csc.rsp of ours, FixtureGuardTests does not look at them, and a test in them runs without [HostileCulture].
+        /// </summary>
+        [Fact]
+        public void Every_source_under_Assets_lies_in_the_folder_of_one_of_the_six_asmdefs()
+        {
+            IReadOnlyList<string> folders = new[] { CoreAsmdef, ClientAsmdef, EditorAsmdef, SupportAsmdef, EditModeAsmdef, PlayModeAsmdef }
+                .Select(asmdef => asmdef[..(asmdef.LastIndexOf('/') + 1)])
+                .ToList();
+            IReadOnlyList<string> sources = FilesWithExtension("Assets", ".cs").Select(path => RepositoryLayout.Relative(path)).ToList();
+
+            IReadOnlyList<string> outside = sources.Where(source => !folders.Any(folder => source.StartsWith(folder, StringComparison.Ordinal))).ToList();
+
+            Assert.NotEmpty(sources);
+            Assert.True(outside.Count == 0,
+                "Unity compiles these into Assembly-CSharp or Assembly-CSharp-Editor, outside every CoveredLot assembly: " + string.Join(", ", outside));
         }
 
         /// <summary>

@@ -1,0 +1,13 @@
+Doctored for UnityEditorLogTests, in the form of lines from a Unity editor log: Bee's first pass ran on an out-of-date build graph and compiled the support assembly with its old options, so Bee compiled it again; the client, compiled once, keeps its warning.
+Built from '6000.3/staging' branch; Version is '6000.3.29f1 (0123456789ab) revision 1234567'; Using compiler version '194234433'; Build Type 'Release'
+ExitCode: 4 Duration: 2s401ms
+[290/722    2s] Csc Library/Bee/artifacts/0123abcd.dag/CoveredLot.Tests.Support.dll (+2 others)
+Assets\Tests\Support\TestCulture.cs(23,29): warning CS8632: The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
+[291/722    2s] Csc Library/Bee/artifacts/0123abcd.dag/CoveredLot.Client.dll (+2 others)
+Assets\CoveredLot\Client\GameRoot.cs(31,17): warning CS0168: The variable 'unused' is declared but never used
+*** Tundra requires additional run (2.35 seconds), 2 items updated, 569 evaluated
+ExitCode: 0 Duration: 0s722ms
+[381/722    2s] Csc Library/Bee/artifacts/0123abcd.dag/CoveredLot.Tests.Support.dll (+2 others)
+[382/722    0s] CopyFiles Library/ScriptAssemblies/CoveredLot.Tests.Support.dll
+*** Tundra build success (0.73 seconds), 11 items updated, 722 evaluated
+Test run completed. Exiting with code 0 (Ok). Run completed.

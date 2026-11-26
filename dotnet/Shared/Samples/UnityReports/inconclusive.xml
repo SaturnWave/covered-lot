@@ -1,13 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Doctored for UnityTestReportTests: one of three tests ended inconclusive; the culture guard passed. -->
+<!-- Doctored for UnityTestReportTests: one of three tests ended inconclusive; the culture guard passed under tr-TR. -->
 <test-run id="2" testcasecount="3" result="Inconclusive" total="3" passed="2" failed="0" inconclusive="1" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-11-26 12:00:00Z" end-time="2026-11-26 12:00:02Z" duration="2.0">
-  <test-suite type="TestSuite" id="1000" name="covered-lot" fullname="covered-lot" runstate="Runnable" testcasecount="3" result="Inconclusive" total="3" passed="2" failed="0" inconclusive="1" skipped="0" asserts="0">
-    <test-suite type="TestFixture" id="1002" name="CultureGuardTests" fullname="CoveredLot.Tests.EditMode.CultureGuardTests" classname="CoveredLot.Tests.EditMode.CultureGuardTests" runstate="Runnable" testcasecount="2" result="Passed" total="2" passed="2" failed="0" inconclusive="0" skipped="0" asserts="0">
-      <test-case id="1003" name="The_culture_breaks_at_least_one_invariant_assumption" fullname="CoveredLot.Tests.EditMode.CultureGuardTests.The_culture_breaks_at_least_one_invariant_assumption" methodname="The_culture_breaks_at_least_one_invariant_assumption" classname="CoveredLot.Tests.Support.CultureGuardFixture" runstate="Runnable" result="Passed" duration="0.01" asserts="0" />
-      <test-case id="1004" name="The_tests_run_under_the_culture_that_PUZZLE_TEST_CULTURE_names" fullname="CoveredLot.Tests.EditMode.CultureGuardTests.The_tests_run_under_the_culture_that_PUZZLE_TEST_CULTURE_names" methodname="The_tests_run_under_the_culture_that_PUZZLE_TEST_CULTURE_names" classname="CoveredLot.Tests.Support.CultureGuardFixture" runstate="Runnable" result="Passed" duration="0.01" asserts="0" />
-    </test-suite>
-    <test-suite type="TestFixture" id="1005" name="UndecidedTests" fullname="CoveredLot.Tests.EditMode.UndecidedTests" classname="CoveredLot.Tests.EditMode.UndecidedTests" runstate="Runnable" testcasecount="1" result="Inconclusive" total="1" passed="0" failed="0" inconclusive="1" skipped="0" asserts="0">
-      <test-case id="1006" name="Assumes_too_much" fullname="CoveredLot.Tests.EditMode.UndecidedTests.Assumes_too_much" methodname="Assumes_too_much" classname="CoveredLot.Tests.EditMode.UndecidedTests" runstate="Runnable" result="Inconclusive" duration="0.00" asserts="0" />
+  <test-suite type="TestSuite" id="1000" name="Covered Lot" fullname="Covered Lot" runstate="Runnable" testcasecount="3" result="Inconclusive" total="3" passed="2" failed="0" inconclusive="1" skipped="0" asserts="0">
+    <test-suite type="Assembly" id="1001" name="CoveredLot.Tests.EditMode.dll" fullname="CoveredLot.Tests.EditMode.dll" runstate="Runnable" testcasecount="3" result="Inconclusive" total="3" passed="2" failed="0" inconclusive="1" skipped="0" asserts="0">
+      <test-suite type="TestFixture" id="1002" name="CultureGuardTests" fullname="CoveredLot.Tests.EditMode.CultureGuardTests" classname="CoveredLot.Tests.EditMode.CultureGuardTests" runstate="Runnable" testcasecount="2" result="Passed" total="2" passed="2" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <test-case id="1003" name="The_culture_breaks_at_least_one_invariant_assumption" fullname="CoveredLot.Tests.EditMode.CultureGuardTests.The_culture_breaks_at_least_one_invariant_assumption" methodname="The_culture_breaks_at_least_one_invariant_assumption" classname="CoveredLot.Tests.Support.CultureGuardFixture" runstate="Runnable" result="Passed" duration="0.01" asserts="0" />
+        <test-case id="1004" name="The_tests_run_under_the_culture_that_PUZZLE_TEST_CULTURE_names" fullname="CoveredLot.Tests.EditMode.CultureGuardTests.The_tests_run_under_the_culture_that_PUZZLE_TEST_CULTURE_names" methodname="The_tests_run_under_the_culture_that_PUZZLE_TEST_CULTURE_names" classname="CoveredLot.Tests.Support.CultureGuardFixture" runstate="Runnable" result="Passed" duration="0.01" asserts="0">
+          <output><![CDATA[culture under test: tr-TR
+]]></output>
+        </test-case>
+      </test-suite>
+      <test-suite type="TestFixture" id="1005" name="UndecidedTests" fullname="CoveredLot.Tests.EditMode.UndecidedTests" classname="CoveredLot.Tests.EditMode.UndecidedTests" runstate="Runnable" testcasecount="1" result="Inconclusive" total="1" passed="0" failed="0" inconclusive="1" skipped="0" asserts="0">
+        <test-case id="1006" name="Assumes_too_much" fullname="CoveredLot.Tests.EditMode.UndecidedTests.Assumes_too_much" methodname="Assumes_too_much" classname="CoveredLot.Tests.EditMode.UndecidedTests" runstate="Runnable" result="Inconclusive" duration="0.00" asserts="0" />
+      </test-suite>
     </test-suite>
   </test-suite>
 </test-run>

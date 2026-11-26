@@ -10,15 +10,18 @@ namespace CoveredLot.Shared
     /// <list type="bullet">
     /// <item><description>names no member of the rules engine's JamRules, Attempt`3, LotLoader, LotText, LotSolver,
     /// LotPackBuilder or LotClues;</description></item>
-    /// <item><description>calls no ToString, Parse or TryParse of a System number type, whatever provider it passes;</description></item>
+    /// <item><description>calls no ToString, Parse or TryParse of a System number type, whatever provider it passes, and
+    /// hands no number to a member that writes its text: StringBuilder's Append and Insert, TextWriter's and Console's
+    /// Write and WriteLine;</description></item>
     /// <item><description>calls no String.Format, with or without a provider, no String.Concat overload that takes an object,
     /// and no Convert.ToString;</description></item>
     /// <item><description>calls no UnityEngine.Color or Color32 constructor and sets neither to its default value
     /// (<c>new Color()</c> or <c>default</c>, which call no constructor).</description></item>
     /// </list>
-    /// The member bans cover the ToString, Parse and TryParse of the integer types only, refuse String.Format only without a
-    /// provider, and refuse nothing of Convert; these rules close those three gaps for the Client. Like the bans they name
-    /// members, so these pass them: a number formatted through Object.ToString (boxed, or as a generic T), a culture-sensitive
+    /// The member bans cover the ToString, Parse and TryParse of the integer types only, StringBuilder's Append and Insert of
+    /// an integer or an object only, refuse String.Format only without a provider, and refuse nothing of Convert, TextWriter
+    /// or Console; these rules close those gaps for the Client. Like the bans they name members, so these pass them: a number
+    /// formatted through Object.ToString (boxed, or as a generic T, as Debug.Log formats its message), a culture-sensitive
     /// StringComparison value, Convert's parsing, DateTime text; a mention of a rules type that uses none of its members (a
     /// local, a cast, typeof); and a colour that no constructor makes, such as Color's static colours (Color.red), Color.Lerp,
     /// the conversion from Color32 or ColorUtility. Each rule is shown on planted samples (dotnet/Shared/Samples/ClientRuleSamples.cs)
@@ -41,6 +44,20 @@ namespace CoveredLot.Shared
         private static readonly IReadOnlySet<string> NumberTextMembers = new HashSet<string>(StringComparer.Ordinal)
         {
             "ToString", "Parse", "TryParse",
+        };
+
+        /// <summary>
+        /// The members that write the text of a value they are given (Type::Member), each with the position of the parameter
+        /// that takes the value: StringBuilder.Insert takes its index first, and an Int32 index makes no text.
+        /// </summary>
+        private static readonly IReadOnlyDictionary<string, int> ValueParameterOfWriters = new Dictionary<string, int>(StringComparer.Ordinal)
+        {
+            ["System.Text.StringBuilder::Append"] = 0,
+            ["System.Text.StringBuilder::Insert"] = 1,
+            ["System.IO.TextWriter::Write"] = 0,
+            ["System.IO.TextWriter::WriteLine"] = 0,
+            ["System.Console::Write"] = 0,
+            ["System.Console::WriteLine"] = 0,
         };
 
         /// <summary>The System number types: the integers, the floating-point types and decimal, native-sized and big integers.</summary>
@@ -90,7 +107,10 @@ namespace CoveredLot.Shared
                 yield return CallsRulesCode;
             }
 
-            if (NumberTypes.Contains(type) && NumberTextMembers.Contains(use.MemberName))
+            bool writesANumber = ValueParameterOfWriters.TryGetValue(type + "::" + use.MemberName, out int valueParameter)
+                && valueParameter < use.Parameters.Count
+                && NumberTypes.Contains(use.Parameters[valueParameter].Display);
+            if ((NumberTypes.Contains(type) && NumberTextMembers.Contains(use.MemberName)) || writesANumber)
             {
                 yield return MakesNumberText;
             }

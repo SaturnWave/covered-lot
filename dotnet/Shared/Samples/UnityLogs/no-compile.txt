@@ -1,0 +1,11 @@
+Doctored for UnityEditorLogTests, in the form of lines from a Unity editor log: no source changed since Bee's last build, so Bee copies the CoveredLot assemblies it built before and compiles none of them.
+Built from '6000.3/staging' branch; Version is '6000.3.29f1 (0123456789ab) revision 1234567'; Using compiler version '194234433'; Build Type 'Release'
+[ScriptCompilation] Requested script compilation because: Assetdatabase observed changes in script compilation related files
+[711/722    0s] CopyFiles Library/ScriptAssemblies/CoveredLot.Core.dll
+[712/722    0s] CopyFiles Library/ScriptAssemblies/CoveredLot.Client.dll
+[713/722    0s] CopyFiles Library/ScriptAssemblies/CoveredLot.Editor.dll
+[714/722    0s] CopyFiles Library/ScriptAssemblies/CoveredLot.Tests.Support.dll
+[715/722    0s] CopyFiles Library/ScriptAssemblies/CoveredLot.Tests.EditMode.dll
+[716/722    0s] CopyFiles Library/ScriptAssemblies/CoveredLot.Tests.PlayMode.dll
+*** Tundra build success (0.31 seconds), 6 items updated, 722 evaluated
+Test run completed. Exiting with code 0 (Ok). Run completed.

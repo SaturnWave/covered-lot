@@ -4,11 +4,15 @@
 #   2. tools/check-dotnet.sh: the .NET tests of the Unity-free Core, under tr-TR and under sv-SE;
 #   3. the Unity tests, EditMode and PlayMode, each under tr-TR and under sv-SE, through `unity test`, which waits for
 #      the editor and never passes -quit. Each run writes its NUnit report and editor log to
-#      artifacts/local/unity/<mode>-<culture>.xml and .log. This script first deletes the old reports and logs, so one
-#      of an earlier run can never stand in for a run that wrote none, and the CoveredLot DLLs and PDBs in
-#      Library/ScriptAssemblies, which the first run writes again from Unity's build of the current sources. Unity
-#      compiles by content: a source whose time changed but whose content did not (a touch, a checkout) leaves its DLL
-#      as it was, older than the source, so without the deletion UnityChecks would refuse a DLL that is current;
+#      artifacts/local/unity/<mode>-<culture>.xml and .log. This script first deletes:
+#      - the old reports and logs, so one of an earlier run can never stand in for a run that wrote none;
+#      - Unity's build of the CoveredLot assemblies: the DLLs and PDBs in Library/ScriptAssemblies, and Bee's own
+#        copies of them in Library/Bee/artifacts, so the first run compiles every CoveredLot assembly from the current
+#        sources and its log holds the compiler's output, which UnityChecks reads. Without the Bee copies Unity only
+#        copies its earlier build back, and a source whose time changed but whose content did not (a touch, a
+#        checkout) keeps a DLL older than itself, which UnityChecks refuses;
+#      - any Assembly-CSharp DLL in Library/ScriptAssemblies, which Unity builds from scripts outside every asmdef
+#        folder, so UnityChecks finds one only when these runs built it;
 #   4. the repository after those runs: no *.meta file is untracked, and git status, the diff against HEAD and the
 #      untracked files are as they were before the runs (a session that does not quit at once saves the upgrades that
 #      packages make on load);
@@ -30,7 +34,9 @@ readonly UNITY_TIMEOUT_SECONDS=1800
 readonly LOCK_FILE=Temp/UnityLockfile
 readonly RUNS_DIR=artifacts/local/unity
 readonly CHECKS_DIR=artifacts/local/unity-checks
+readonly STATE_DIR=artifacts/local/check
 readonly SCRIPT_ASSEMBLIES_DIR=Library/ScriptAssemblies
+readonly BEE_ARTIFACTS_DIR=Library/Bee/artifacts
 readonly TRX_NAME=CoveredLot.UnityChecks.trx
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
@@ -44,7 +50,10 @@ fi
 
 # The editor wants absolute paths. Git Bash's pwd -W gives the Windows form; elsewhere pwd is the absolute path.
 repo_root="$(pwd -W 2>/dev/null || pwd)"
-work_dir="$(mktemp -d)"
+# The state files hold git status and the whole diff against HEAD, so they stay on the repository's drive, in an ignored
+# folder, rather than in the system temp folder.
+mkdir -p "$STATE_DIR"
+work_dir="$(mktemp -d "$STATE_DIR/run.XXXXXX")"
 trap 'rm -rf "$work_dir"' EXIT
 
 summary=()
@@ -161,7 +170,9 @@ for mode in "${MODES[@]}"; do
     rm -f "$RUNS_DIR/$mode-$culture.xml" "$RUNS_DIR/$mode-$culture.log" "$RUNS_DIR/$mode-$culture.cli.txt"
   done
 done
-rm -f "$SCRIPT_ASSEMBLIES_DIR"/CoveredLot*.dll "$SCRIPT_ASSEMBLIES_DIR"/CoveredLot*.pdb
+rm -f "$SCRIPT_ASSEMBLIES_DIR"/CoveredLot*.dll "$SCRIPT_ASSEMBLIES_DIR"/CoveredLot*.pdb \
+  "$SCRIPT_ASSEMBLIES_DIR"/Assembly-CSharp*.dll "$SCRIPT_ASSEMBLIES_DIR"/Assembly-CSharp*.pdb \
+  "$BEE_ARTIFACTS_DIR"/*.dag/CoveredLot.*.dll "$BEE_ARTIFACTS_DIR"/*.dag/CoveredLot.*.pdb
 for mode in "${MODES[@]}"; do
   for culture in "${CULTURES[@]}"; do
     step "Unity $mode tests under $culture" unity_tests "$mode" "$culture"

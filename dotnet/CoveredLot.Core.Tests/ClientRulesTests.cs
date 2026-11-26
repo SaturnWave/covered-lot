@@ -43,6 +43,11 @@ namespace CoveredLot.Core.Tests
             { "FormattedWithAProvider", "System.String::Format(System.IFormatProvider, ", TextFromValues },
             { "ConcatenatedObject", "System.String::Concat(System.Object, System.Object)", TextFromValues },
             { "ConvertedText", "System.Convert::ToString(System.Int64, System.IFormatProvider)", TextFromValues },
+            { "AppendedFloat", "System.Text.StringBuilder::Append(System.Single)", NumberText },
+            { "InsertedDouble", "System.Text.StringBuilder::Insert(System.Int32, System.Double)", NumberText },
+            { "WrittenDecimal", "System.IO.TextWriter::Write(System.Decimal)", NumberText },
+            { "WrittenLineOfAFloat", "System.IO.TextWriter::WriteLine(System.Single)", NumberText },
+            { "ConsoleWrittenDouble", "System.Console::Write(System.Double)", NumberText },
             { "NewColour", "UnityEngine.Color::.ctor(", Colour },
             { "NewColour32", "UnityEngine.Color32::.ctor(", Colour },
             { "DefaultColour", "the default value of UnityEngine.Color:", Colour },
@@ -81,8 +86,10 @@ namespace CoveredLot.Core.Tests
             IReadOnlyList<LocatedMemberUse> read = Scan.Value.MemberUses.Where(use => use.Location.StartsWith(CleanSample + "::", StringComparison.Ordinal)).ToList();
             IReadOnlyList<Violation> reported = Scan.Value.Violations.Where(violation => violation.Location.StartsWith(CleanSample + "::", StringComparison.Ordinal)).ToList();
 
-            // The rules read the clean sample's member uses: its string concatenation, comparison and join.
+            // The rules read the clean sample's member uses: its string concatenation, comparison and join, and a builder's
+            // Insert whose Int32 index makes no text.
             Assert.Contains(read, use => use.Use.Display == "System.String::Concat(System.String, System.String)");
+            Assert.Contains(read, use => use.Use.Display == "System.Text.StringBuilder::Insert(System.Int32, System.String)");
             Assert.True(reported.Count == 0, "The Client's rules report the clean sample:\n" + string.Join("\n", reported));
         }
 

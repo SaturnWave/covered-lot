@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Doctored for UnityTestReportTests: every test passed, the culture guard's two under tr-TR among them, but one test comes from Assembly-CSharp-Editor, which Unity builds from a script outside every asmdef folder; such a test runs without [HostileCulture] and without our csc.rsp. -->
+<test-run id="2" testcasecount="3" result="Passed" total="3" passed="3" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-11-26 12:00:00Z" end-time="2026-11-26 12:00:02Z" duration="2.0">
+  <test-suite type="TestSuite" id="1000" name="Covered Lot" fullname="Covered Lot" runstate="Runnable" testcasecount="3" result="Passed" total="3" passed="3" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <test-suite type="Assembly" id="1001" name="CoveredLot.Tests.EditMode.dll" fullname="CoveredLot.Tests.EditMode.dll" runstate="Runnable" testcasecount="2" result="Passed" total="2" passed="2" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <test-suite type="TestFixture" id="1002" name="CultureGuardTests" fullname="CoveredLot.Tests.EditMode.CultureGuardTests" classname="CoveredLot.Tests.EditMode.CultureGuardTests" runstate="Runnable" testcasecount="2" result="Passed" total="2" passed="2" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <test-case id="1003" name="The_culture_breaks_at_least_one_invariant_assumption" fullname="CoveredLot.Tests.EditMode.CultureGuardTests.The_culture_breaks_at_least_one_invariant_assumption" methodname="The_culture_breaks_at_least_one_invariant_assumption" classname="CoveredLot.Tests.Support.CultureGuardFixture" runstate="Runnable" result="Passed" duration="0.01" asserts="0" />
+        <test-case id="1004" name="The_tests_run_under_the_culture_that_PUZZLE_TEST_CULTURE_names" fullname="CoveredLot.Tests.EditMode.CultureGuardTests.The_tests_run_under_the_culture_that_PUZZLE_TEST_CULTURE_names" methodname="The_tests_run_under_the_culture_that_PUZZLE_TEST_CULTURE_names" classname="CoveredLot.Tests.Support.CultureGuardFixture" runstate="Runnable" result="Passed" duration="0.01" asserts="0">
+          <output><![CDATA[culture under test: tr-TR
+]]></output>
+        </test-case>
+      </test-suite>
+    </test-suite>
+    <test-suite type="Assembly" id="1007" name="Assembly-CSharp-Editor.dll" fullname="Assembly-CSharp-Editor.dll" runstate="Runnable" testcasecount="1" result="Passed" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <test-suite type="TestFixture" id="1008" name="StrayTests" fullname="StrayTests" classname="StrayTests" runstate="Runnable" testcasecount="1" result="Passed" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <test-case id="1009" name="Runs_unguarded" fullname="StrayTests.Runs_unguarded" methodname="Runs_unguarded" classname="StrayTests" runstate="Runnable" result="Passed" duration="0.01" asserts="0" />
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

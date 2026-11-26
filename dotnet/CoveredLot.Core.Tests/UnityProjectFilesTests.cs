@@ -12,7 +12,8 @@ namespace CoveredLot.Core.Tests
 {
     /// <summary>
     /// The Unity project's committed files, read as text (design sections 4 and 12): the editor version; the Input
-    /// System as the only active input handling; entering Play mode reloads the domain and the scene; the engine DLLs
+    /// System as the only active input handling; the Android build's minimum API level, which Unity's own API cannot show
+    /// below its floor; entering Play mode reloads the domain and the scene; the engine DLLs
     /// are referenced only by the assemblies that name them and have their references validated; the URP asset is
     /// saved in the form of the pinned URP, which would otherwise rewrite it in any editor session that does not quit
     /// at once; the package manifest holds no local package, none of the packages design section 12 removes, the
@@ -96,6 +97,17 @@ namespace CoveredLot.Core.Tests
         public void The_input_system_is_the_only_active_input_handling()
         {
             AssertSetting(new Setting(PlayerSettingsFile, "  activeInputHandler"), "1");
+        }
+
+        /// <summary>
+        /// API level 25, the 6.3 floor. SettingsGuardTests reads PlayerSettings.Android.minSdkVersion, but Unity 6.3's
+        /// AndroidSdkVersions starts at AndroidApiLevel25 and the getter reads a lower saved level as 25, so only the
+        /// saved value shows a level below the floor.
+        /// </summary>
+        [Fact]
+        public void The_android_build_needs_api_level_25()
+        {
+            AssertSetting(new Setting(PlayerSettingsFile, "  AndroidMinSdkVersion"), "25");
         }
 
         /// <summary>

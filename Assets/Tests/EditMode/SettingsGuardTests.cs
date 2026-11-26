@@ -27,10 +27,15 @@ namespace CoveredLot.Tests.EditMode
             Assert.That(PlayerSettings.defaultInterfaceOrientation, Is.EqualTo(UIOrientation.Portrait), "PlayerSettings.defaultInterfaceOrientation");
         }
 
+        /// <summary>
+        /// Section 12's value, written out: ProjectSetup writes Copy.GameTitle, so a comparison with that constant alone would
+        /// pass a changed title too. The title the game shows must still be the product name.
+        /// </summary>
         [Test]
-        public void The_product_name_is_the_game_title()
+        public void The_product_name_is_Covered_Lot_the_title_the_game_shows()
         {
-            Assert.That(PlayerSettings.productName, Is.EqualTo(Copy.GameTitle), "PlayerSettings.productName");
+            Assert.That(PlayerSettings.productName, Is.EqualTo("Covered Lot"), "PlayerSettings.productName");
+            Assert.That(Copy.GameTitle, Is.EqualTo(PlayerSettings.productName), "Copy.GameTitle, the title the game shows");
         }
 
         /// <summary>A temporary id that Google Play cannot accept, so no build can ship by mistake; P11 picks the real one.</summary>
@@ -54,6 +59,10 @@ namespace CoveredLot.Tests.EditMode
             Assert.That(PlayerSettings.Android.targetArchitectures, Is.EqualTo(AndroidArchitecture.ARM64), "PlayerSettings.Android.targetArchitectures");
         }
 
+        /// <summary>
+        /// AndroidSdkVersions starts at AndroidApiLevel25 in 6.3, and the getter reads a lower saved level as 25, so this
+        /// sees only a level above the floor; UnityProjectFilesTests pins the saved value.
+        /// </summary>
         [Test]
         public void The_android_build_needs_api_level_25()
         {

@@ -8,9 +8,10 @@ namespace CoveredLot.UnityChecks
 {
     /// <summary>
     /// The code-standard rules of design section 10.4 on what Unity built: no assembly of the game or its tests has a
-    /// generic, bare, filtered or empty catch block, or a type reference to System.Random or UnityEngine.Random; Core, the
-    /// Client and the Editor have no async state machine, which holds a compiler-written generic catch; and Core has no
-    /// catch block at all and no static field that can be reassigned. CoveredLot.Core.Tests shows each rule on planted
+    /// generic or bare catch block, with or without a when-filter, an empty catch block, or a type reference to
+    /// System.Random or UnityEngine.Random; Core, the Client and the Editor have no async state machine, which holds a
+    /// compiler-written generic catch; and Core has no catch block at all and no static field that can be reassigned. A
+    /// catch of a specific type with a when-filter passes outside Core. CoveredLot.Core.Tests shows each rule on planted
     /// samples (HygieneTests there); these apply them to Unity's compiler output.
     /// </summary>
     public sealed class HygieneTests
@@ -23,7 +24,7 @@ namespace CoveredLot.UnityChecks
 
         [Theory]
         [MemberData(nameof(EveryAssembly))]
-        public void No_catch_block_is_generic_bare_filtered_or_empty(string name)
+        public void No_catch_block_is_generic_or_bare_with_or_without_a_filter_or_empty(string name)
         {
             using AssemblyScanner scanner = UnityOutputs.Scan(name);
 

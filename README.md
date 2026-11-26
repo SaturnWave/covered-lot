@@ -83,10 +83,12 @@ Run these from the repository root in Git Bash:
   cultures. It needs the Unity CLI (`unity`) and the .NET SDK, and the Unity editor closed: it
   refuses to start while `Temp/UnityLockfile` exists. Once the project is imported, a run takes
   about two minutes. Before the Unity runs it deletes their old reports and logs in
-  `artifacts/local/unity/` and the CoveredLot DLLs in `Library/ScriptAssemblies/`, so
-  everything UnityChecks reads comes from this run. After them it fails if a `.meta` file is
-  untracked, or if the runs changed git status, the diff against HEAD or an untracked file. It
-  exits 1 when any step failed.
+  `artifacts/local/unity/`, Unity's build of the CoveredLot assemblies (in
+  `Library/ScriptAssemblies/` and Bee's copies in `Library/Bee/artifacts/`) and any
+  `Assembly-CSharp` DLL, so the first run compiles every CoveredLot assembly and everything
+  UnityChecks reads comes from this run. After them it fails if a `.meta` file is untracked,
+  or if the runs changed git status, the diff against HEAD or an untracked file; while it runs
+  it keeps what it compares in `artifacts/local/check/`. It exits 1 when any step failed.
 - `tools/check-repo.sh` checks the ignore and line-ending rules against a fixed table, and
   that every script is executable and fixes its locale, and that `.editorconfig` leaves the
   bytes of the level texts and of Unity's own files alone.
@@ -115,13 +117,14 @@ check:
 - that no Core source names a culture-sensitive `StringComparison` value, which the policy
   lets through;
 - the game's three asmdefs and the three test asmdefs, property by property, no other asmdef
-  under `Assets/CoveredLot` or `Assets/Tests`, the `csc.rsp` rules, and that Unity and .NET
-  compile the same files into Core;
+  under `Assets/CoveredLot` or `Assets/Tests`, no C# source under `Assets` outside the folders
+  of those six, the `csc.rsp` rules, and that Unity and .NET compile the same files into Core;
 - the rules UnityChecks applies to Unity's builds: the Client's own rules, each planted use
   reported and the clean sample passing, and the report and log rules, each kind of bad
   report or log refused and the good ones passing (`dotnet/Shared/Samples`);
 - the Unity project's files: the editor version, the Input System as the only input
-  handling, the domain reload on entering Play mode, the engine DLLs' import settings, the
+  handling, the Android minimum API level 25, which Unity's own API cannot show below that
+  floor, the domain reload on entering Play mode, the engine DLLs' import settings, the
   URP asset saved in the pinned URP's form, the package manifest, and that every `Assets/`
   path a project setting names exists;
 - what the public repository must not hold: a Unity Cloud link, a keystore of its own, a
@@ -139,25 +142,31 @@ picks the SDK, with `PUZZLE_TEST_CULTURE` set to `tr-TR` or `sv-SE`; without it 
 `Assets/Tests` holds three assemblies that Unity builds only with the tests: `Support`, with
 `[HostileCulture]`, `TestCulture` and the culture guard that both test assemblies run, then
 `EditMode` and `PlayMode`. Every fixture runs under `[HostileCulture]`: before each test's
-set-up it applies the culture `PUZZLE_TEST_CULTURE` names, tr-TR or sv-SE, and after the
-teardown it puts back the cultures it found. When the variable is unset or names another
-culture, every test fails and names it. The EditMode tests check:
+set-up it applies the culture `PUZZLE_TEST_CULTURE` names, tr-TR or sv-SE, to the current, UI
+and default-thread cultures, and after the teardown it puts back each culture it found. When
+the variable is unset or names another culture, every test fails and names it. The EditMode
+tests check:
 
-- the culture guard: the tests run under the requested culture, and that culture breaks at
-  least one invariant assumption inside Unity's runtime (there, sv-SE differs only by its
-  decimal comma and its no-break-space digit groups);
+- the culture guard: the tests run under the culture the variable names, which the guard
+  reads itself and writes into the report, and that culture breaks at least one invariant
+  assumption inside Unity's runtime (there, sv-SE differs only by its decimal comma and its
+  no-break-space digit groups);
+- `[HostileCulture]` itself, driven on a fresh instance: it applies the culture to all four
+  and puts back each of the four it found;
 - the engine and the levels inside Unity: `presentation.json`, the 98 levels it lists and the
   Example load from Resources and read and load through the engine DLLs; each level written
   back gives its asset text; each listed level has its presentation fingerprint; and on the
   Example, tapping vehicle 5 first is rejected, blocked by vehicle 4, and changes nothing, the
   taps 0,3,4,2,8,5,1,6,7 win, and the taps 0,3,1,8 fill the bays and fail;
-- the settings that Unity reads through its own APIs: portrait, the product name, the Android
-  application id, IL2CPP, ARM64 only, API level 25, the Game category, .NET Standard 2.1,
-  minimal stripping, editor 6000.3.29f1, and Main as the only scene in the build;
+- the settings that Unity reads through its own APIs: portrait, the product name
+  `Covered Lot`, which is also the title the game shows, the Android application id, IL2CPP,
+  ARM64 only, API level 25 (Unity reads a lower saved level as 25, so the .NET checks pin the
+  saved value), the Game category, .NET Standard 2.1, minimal stripping, editor 6000.3.29f1,
+  and Main as the only scene in the build;
 - that every fixture of the test assemblies carries `[HostileCulture]`.
 
 The PlayMode tests run the culture guard, and load the Main scene by name: its Game object's
-UIDocument then holds one label, the game's title.
+UIDocument is then attached to a panel and holds one label, the game's title.
 
 To run one mode by hand, with the editor closed:
 
@@ -170,24 +179,36 @@ before starting the editor.
 ## Checks of Unity's builds
 
 `dotnet/CoveredLot.UnityChecks` reads what the four Unity runs leave, and only
-`tools/check.sh` runs it. It fails when a CoveredLot DLL, a report or a log is missing, or when
-a DLL is older than the newest source of its assembly. Unity compiles by content, so after a
-touch or a checkout that changed no content, run `tools/check.sh` rather than UnityChecks
-alone. It checks, on Unity's own builds:
+`tools/check.sh` runs it. It fails when a CoveredLot DLL, a report or a log is missing, when a
+DLL is older than the newest source of its assembly, or when a report or a log is older than
+the newest DLL. Unity compiles by content, so after a touch or a checkout that changed no
+content, or after an editor session, run `tools/check.sh` rather than UnityChecks alone. It
+checks, on Unity's own builds:
 
-- every CoveredLot assembly, the tests' included: no generic, bare, filtered or empty catch
-  block, and no type reference to `System.Random` or `UnityEngine.Random`;
+- every CoveredLot assembly, the tests' included: no generic or bare catch block, with or
+  without a when-filter, no empty catch block, and no type reference to `System.Random` or
+  `UnityEngine.Random`;
+- that Unity built no `Assembly-CSharp` DLL, which it builds from a script outside the asmdef
+  folders;
 - Core, the Client and the Editor: no async state machine;
 - Core: no catch block at all, no static field that can be reassigned, no floating point,
   nothing the Unity-bound API policy refuses, and no reference beyond netstandard and the two
   engine DLLs;
 - the Client and the Editor: none of the members that policy bans;
 - the Client: no member of the rules engine's types, no `ToString`, `Parse` or `TryParse` of a
-  number type, no `String.Format`, no `String.Concat` of objects, no `Convert.ToString`, and no
-  `Color` or `Color32` constructed;
-- each run's report: at least one test, every test passed, none skipped, and the culture guard
-  among them; each run's log: no compiler warning about a file under `Assets/CoveredLot` or
-  `Assets/Tests`.
+  number type, no number handed to `StringBuilder`'s `Append` or `Insert` or to `TextWriter`'s
+  or `Console`'s `Write` and `WriteLine`, no `String.Format`, no `String.Concat` of objects, no
+  `Convert.ToString`, and no `Color` or `Color32` constructed;
+- each run's report: at least one test, every test passed, none skipped, every test from that
+  mode's test assembly, and both tests of the culture guard, which wrote that it ran under the
+  run's culture;
+- each run's log: a finished log of the editor the project pins, with no compiler warning
+  about a file under `Assets/CoveredLot` or `Assets/Tests` (a compile that the same log shows
+  Bee repeating does not count); and the four logs together show Unity compiling every
+  CoveredLot assembly. A log holds compiler output only for what Unity compiled during the
+  run, which is why `tools/check.sh` deletes Unity's build first. The `-warnaserror+` in each
+  assembly's `csc.rsp` is what keeps warnings out of our code; the log rule is a second line
+  of defence.
 
 These rules name types and members, so they show that the code uses none of those, not that it
 makes no culture-dependent text: the comments of `UnityBoundApiPolicy` and `ClientRules` in
