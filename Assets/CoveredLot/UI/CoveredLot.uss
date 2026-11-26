@@ -1,0 +1,16 @@
+/*
+ * Covered Lot's look (design sections 6 and 9). Every colour and size of the screens lives in this file, so the
+ * designs restyle the game here; the code only adds class names. The colours are a placeholder until the designs
+ * arrive. ProjectSetup clears the camera to the same page colour, so no other colour shows before the panel draws.
+ */
+
+/* The panel's root: the page background, and the text colour its elements inherit unless a rule sets their own. */
+:root {
+  background-color: #F4F1EA;
+  color: #1D1D1D;
+}
+
+/* The game's title, in body text: 16 panel units, about 16dp on a 360dp-wide phone (design section 6). */
+.covered-lot-title {
+  font-size: 16px;
+}

@@ -43,16 +43,6 @@ namespace CoveredLot.Core.Tests
             new("^levels [0-9]+$", RegexOptions.CultureInvariant),
         };
 
-        /// <summary>
-        /// A drive-letter path as Windows writes it (a letter, a colon, a slash or backslash) or as Git Bash writes it (a
-        /// slash, a letter, a slash), or a network share (two backslashes). Described in words, so this file passes the scan.
-        /// </summary>
-        private static readonly Regex DriveLetterOrSharePath = new(
-            @"(?<![A-Za-z0-9])[A-Za-z]:[\\/]|(?<![A-Za-z0-9._~/-])/[A-Za-z]/|\\\\", RegexOptions.CultureInvariant);
-
-        /// <summary>A users or home folder between slashes or backslashes, in any case, or a home-relative path (a tilde and a slash).</summary>
-        private static readonly Regex UserFolder = new(@"[\\/](users|home)[\\/]|~[\\/]", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
-
         /// <summary>A date (2026-11-26, 26.11.2026), a clock time (05:57), or Unix seconds (ten digits) or milliseconds (thirteen).</summary>
         private static readonly Regex Time = new(
             @"\d{4}-\d{2}-\d{2}|(?<![\d.])\d{1,2}[./]\d{1,2}[./]\d{4}(?!\d)|(?<!\d)\d{1,2}:\d{2}(?!\d)|(?<![0-9A-Za-z])(\d{10}|\d{13})(?![0-9A-Za-z])",
@@ -133,8 +123,8 @@ namespace CoveredLot.Core.Tests
         {
             string record = File.ReadAllText(GeneratedPath(RecordName));
 
-            Assert.DoesNotMatch(DriveLetterOrSharePath, record);
-            Assert.DoesNotMatch(UserFolder, record);
+            Assert.DoesNotMatch(MachinePaths.DriveLetterOrSharePath, record);
+            Assert.DoesNotMatch(MachinePaths.UserFolder, record);
             Assert.DoesNotMatch(Time, record);
         }
 
