@@ -207,6 +207,11 @@ namespace CoveredLot.Shared
                 "System.Diagnostics.CodeAnalysis.NotNullAttribute", "System.Diagnostics.CodeAnalysis.DoesNotReturnAttribute",
                 "System.Diagnostics.CodeAnalysis.DisallowNullAttribute", "System.Diagnostics.CodeAnalysis.AllowNullAttribute",
                 "System.Diagnostics.CodeAnalysis.MaybeNullAttribute", "System.Diagnostics.CodeAnalysis.SuppressMessageAttribute",
+                // Not the engine's: Unity's source generator (Unity.MonoScriptGenerator.MonoScriptInfoGenerator) adds the type
+                // UnitySourceGeneratedAssemblyMonoScriptTypes_v1 to every assembly Unity compiles, Core included, and marks it
+                // [GeneratedCode] and [EditorBrowsable(EditorBrowsableState.Never)]; markers for tools, no behaviour.
+                "System.CodeDom.Compiler.GeneratedCodeAttribute",
+                "System.ComponentModel.EditorBrowsableAttribute", "System.ComponentModel.EditorBrowsableState",
             })
             {
                 yield return new AllMembers(name);

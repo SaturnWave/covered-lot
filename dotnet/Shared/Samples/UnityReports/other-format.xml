@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Doctored for UnityTestReportTests: a well-formed report in another format (JUnit), which proves nothing about NUnit's counts. -->
+<testsuites tests="1" failures="0">
+  <testsuite name="CoveredLot.Tests.EditMode.CultureGuardTests" tests="1" failures="0">
+    <testcase classname="CoveredLot.Tests.EditMode.CultureGuardTests" name="The_tests_run_under_the_culture_that_PUZZLE_TEST_CULTURE_names" />
+  </testsuite>
+</testsuites>

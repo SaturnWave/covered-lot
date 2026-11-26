@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Checks of what Unity built and ran (design section 10.4): the IL of Library/ScriptAssemblies/CoveredLot*.dll and
+       the reports and logs of the four Unity test runs in artifacts/local/unity. Only tools/check.sh runs it, after those
+       runs; without them every input is missing and it fails. PUZZLE_TEST_CULTURE is required, as for CoveredLot.Core.Tests.
+       It references neither Core nor the engine: the scanner reads the DLLs as files. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>CoveredLot.UnityChecks</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+  <!-- The scanner and the rules, without the planted samples, which only CoveredLot.Core.Tests reads. -->
+  <ItemGroup>
+    <Compile Include="..\Shared\*.cs" Link="Shared\%(Filename)%(Extension)" />
+  </ItemGroup>
+  <!-- The culture rule and the repository's location from CoveredLot.Core.Tests, compiled in as they are. -->
+  <ItemGroup>
+    <Compile Include="..\CoveredLot.Core.Tests\Support\HostileCulture.cs" Link="Support\HostileCulture.cs" />
+    <Compile Include="..\CoveredLot.Core.Tests\Support\RepositoryLayout.cs" Link="Support\RepositoryLayout.cs" />
+    <Compile Include="..\CoveredLot.Core.Tests\CultureGuardTests.cs" Link="CultureGuardTests.cs" />
+  </ItemGroup>
+</Project>

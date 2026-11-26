@@ -28,7 +28,8 @@ namespace CoveredLot.Core.Tests
         private const string EditorConfig = ".editorconfig";
         private const string CSharpSection = "*.cs";
         private const string CscRsp = "csc.rsp";
-        private const string CoveredLotAssets = "Assets/CoveredLot/";
+        /// <summary>The folders whose asmdefs carry a csc.rsp of their own: the game's assemblies and its test assemblies.</summary>
+        private static readonly string[] CscRspFolders = { "Assets/CoveredLot/", "Assets/Tests/" };
 
         /// <summary>Long enough for a cold MSBuild start; a guard run that hangs fails instead of stalling the check.</summary>
         private static readonly TimeSpan GuardRunLimit = TimeSpan.FromMinutes(3);
@@ -120,12 +121,12 @@ namespace CoveredLot.Core.Tests
 
             IReadOnlyList<string> offenders = files
                 .Where(path => IsMsBuildSettingsFile(Path.GetFileName(path)))
-                .Where(path => !SharedBuildFiles.Contains(path, StringComparer.Ordinal) && !IsCscRspBesideACoveredLotAsmdef(path, files))
+                .Where(path => !SharedBuildFiles.Contains(path, StringComparer.Ordinal) && !IsCscRspBesideAnAsmdefOfOurs(path, files))
                 .ToList();
 
             Assert.True(offenders.Count == 0,
                 "Only dotnet/Directory.Build.props, dotnet/Directory.Build.targets and dotnet/Directory.Packages.props may hold build"
-                + " settings, and a csc.rsp may only sit beside a CoveredLot asmdef:\n" + string.Join("\n", offenders));
+                + " settings, and a csc.rsp may only sit beside an asmdef under Assets/CoveredLot or Assets/Tests:\n" + string.Join("\n", offenders));
         }
 
         [Fact]
@@ -158,10 +159,11 @@ namespace CoveredLot.Core.Tests
             || fileName.StartsWith("Directory.Build.", StringComparison.OrdinalIgnoreCase)
             || fileName.StartsWith("Directory.Packages.", StringComparison.OrdinalIgnoreCase);
 
-        /// <summary>A csc.rsp in a folder under Assets/CoveredLot that holds an asmdef: Unity's options for that assembly.</summary>
-        private static bool IsCscRspBesideACoveredLotAsmdef(string path, IReadOnlyList<string> files)
+        /// <summary>A csc.rsp in a folder under Assets/CoveredLot or Assets/Tests that holds an asmdef: Unity's options for that assembly.</summary>
+        private static bool IsCscRspBesideAnAsmdefOfOurs(string path, IReadOnlyList<string> files)
         {
-            if (!path.StartsWith(CoveredLotAssets, StringComparison.Ordinal) || Path.GetFileName(path) != CscRsp)
+            bool isInOurFolders = CscRspFolders.Any(folder => path.StartsWith(folder, StringComparison.Ordinal));
+            if (!isInOurFolders || Path.GetFileName(path) != CscRsp)
             {
                 return false;
             }

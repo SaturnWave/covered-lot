@@ -1,0 +1,8 @@
+Doctored for UnityEditorLogTests, in the form of lines from a Unity editor log: the compiler warns, but never about our code.
+[ScriptCompilation] Requested script compilation because: Assetdatabase observed changes in script compilation related files
+Library/PackageCache/com.unity.render-pipelines.core@0123456789ab/Runtime/Volume/VolumeManager.cs(120,17): warning CS0618: 'Example.Old' is obsolete: 'Use Example.New instead.'
+Library/PackageCache/com.unity.inputsystem@0123456789ab/InputSystem/Example.cs(42,13): warning CS0168: The variable 'unused' is declared but never used
+Assets/ThirdParty/Plugin/Example.cs(7,9): warning CS0219: The variable 'value' is assigned but its value is never used
+Compiling Assets/CoveredLot/Client/CoveredLot.Client.asmdef and Assets/Tests/EditMode/CoveredLot.Tests.EditMode.asmdef
+Refreshing native plugins compatible for Editor in 0.42 ms. Found 0 plugins.
+Executing Assets/CoveredLot/Core tests: 0 warnings, 0 errors

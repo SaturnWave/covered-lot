@@ -41,6 +41,8 @@ Unity CLI, `unity open .`, or with the editor itself: `<editor> -projectPath <re
 
 - `Assets/CoveredLot/Core`, `Client` and `Editor` are the game's three assemblies, each with
   its own `csc.rsp`: warnings are errors and nullable is on, and Core also checks overflow.
+  `Assets/Tests` holds the test assemblies (see Unity tests below), each with the same
+  `csc.rsp` as the Client's.
 - `Assets/CoveredLot/UI/CoveredLot.uss` holds the look, and `Assets/CoveredLot/Scenes/Main.unity`
   is the only scene. For now it shows the game's title.
 - The engine DLLs are imported with Auto Reference off, so only an assembly whose asmdef
@@ -69,13 +71,22 @@ on load is saved only then.
 
 Without the CLI, start `<editor>` with `-batchmode -quit -projectPath <repo> -logFile <log>`,
 plus the `-executeMethod` argument for the setup; from PowerShell, start it through
-`Start-Process -Wait`, because the editor is a GUI program. The Unity test assemblies and the
-checks of Unity's own builds are not here yet.
+`Start-Process -Wait`, because the editor is a GUI program.
 
 ## Checks
 
 Run these from the repository root in Git Bash:
 
+- `tools/check.sh` runs every check, Unity's included, and reports each step:
+  `tools/check-repo.sh`, `tools/check-dotnet.sh`, the Unity tests in EditMode and in PlayMode,
+  each under tr-TR and under sv-SE, and then `dotnet/CoveredLot.UnityChecks` under both
+  cultures. It needs the Unity CLI (`unity`) and the .NET SDK, and the Unity editor closed: it
+  refuses to start while `Temp/UnityLockfile` exists. Once the project is imported, a run takes
+  about two minutes. Before the Unity runs it deletes their old reports and logs in
+  `artifacts/local/unity/` and the CoveredLot DLLs in `Library/ScriptAssemblies/`, so
+  everything UnityChecks reads comes from this run. After them it fails if a `.meta` file is
+  untracked, or if the runs changed git status, the diff against HEAD or an untracked file. It
+  exits 1 when any step failed.
 - `tools/check-repo.sh` checks the ignore and line-ending rules against a fixed table, and
   that every script is executable and fixes its locale, and that `.editorconfig` leaves the
   bytes of the level texts and of Unity's own files alone.
@@ -103,8 +114,12 @@ check:
   stays overflow-checked;
 - that no Core source names a culture-sensitive `StringComparison` value, which the policy
   lets through;
-- the three asmdefs, property by property, the `csc.rsp` rules, and that Unity and .NET
+- the game's three asmdefs and the three test asmdefs, property by property, no other asmdef
+  under `Assets/CoveredLot` or `Assets/Tests`, the `csc.rsp` rules, and that Unity and .NET
   compile the same files into Core;
+- the rules UnityChecks applies to Unity's builds: the Client's own rules, each planted use
+  reported and the clean sample passing, and the report and log rules, each kind of bad
+  report or log refused and the good ones passing (`dotnet/Shared/Samples`);
 - the Unity project's files: the editor version, the Input System as the only input
   handling, the domain reload on entering Play mode, the engine DLLs' import settings, the
   URP asset saved in the pinned URP's form, the package manifest, and that every `Assets/`
@@ -118,3 +133,63 @@ The script fails if either run fails, runs no test or skips one, and writes TRX 
 `artifacts/local/dotnet/<culture>/`. To run the tests by hand, run
 `dotnet test CoveredLot.Core.Tests -c Release` from `dotnet/`, so that its `global.json`
 picks the SDK, with `PUZZLE_TEST_CULTURE` set to `tr-TR` or `sv-SE`; without it they fail.
+
+## Unity tests
+
+`Assets/Tests` holds three assemblies that Unity builds only with the tests: `Support`, with
+`[HostileCulture]`, `TestCulture` and the culture guard that both test assemblies run, then
+`EditMode` and `PlayMode`. Every fixture runs under `[HostileCulture]`: before each test's
+set-up it applies the culture `PUZZLE_TEST_CULTURE` names, tr-TR or sv-SE, and after the
+teardown it puts back the cultures it found. When the variable is unset or names another
+culture, every test fails and names it. The EditMode tests check:
+
+- the culture guard: the tests run under the requested culture, and that culture breaks at
+  least one invariant assumption inside Unity's runtime (there, sv-SE differs only by its
+  decimal comma and its no-break-space digit groups);
+- the engine and the levels inside Unity: `presentation.json`, the 98 levels it lists and the
+  Example load from Resources and read and load through the engine DLLs; each level written
+  back gives its asset text; each listed level has its presentation fingerprint; and on the
+  Example, tapping vehicle 5 first is rejected, blocked by vehicle 4, and changes nothing, the
+  taps 0,3,4,2,8,5,1,6,7 win, and the taps 0,3,1,8 fill the bays and fail;
+- the settings that Unity reads through its own APIs: portrait, the product name, the Android
+  application id, IL2CPP, ARM64 only, API level 25, the Game category, .NET Standard 2.1,
+  minimal stripping, editor 6000.3.29f1, and Main as the only scene in the build;
+- that every fixture of the test assemblies carries `[HostileCulture]`.
+
+The PlayMode tests run the culture guard, and load the Main scene by name: its Game object's
+UIDocument then holds one label, the game's title.
+
+To run one mode by hand, with the editor closed:
+
+    PUZZLE_TEST_CULTURE=tr-TR unity test . --mode EditMode --output "$(pwd -W)/artifacts/local/unity/EditMode-tr-TR.xml" --no-banner -- -logFile "$(pwd -W)/artifacts/local/unity/EditMode-tr-TR.log"
+
+The editor exits 0 when no test ran, so the exit code alone proves nothing: UnityChecks reads
+the report. To run the tests in the editor's Test Runner window, set `PUZZLE_TEST_CULTURE`
+before starting the editor.
+
+## Checks of Unity's builds
+
+`dotnet/CoveredLot.UnityChecks` reads what the four Unity runs leave, and only
+`tools/check.sh` runs it. It fails when a CoveredLot DLL, a report or a log is missing, or when
+a DLL is older than the newest source of its assembly. Unity compiles by content, so after a
+touch or a checkout that changed no content, run `tools/check.sh` rather than UnityChecks
+alone. It checks, on Unity's own builds:
+
+- every CoveredLot assembly, the tests' included: no generic, bare, filtered or empty catch
+  block, and no type reference to `System.Random` or `UnityEngine.Random`;
+- Core, the Client and the Editor: no async state machine;
+- Core: no catch block at all, no static field that can be reassigned, no floating point,
+  nothing the Unity-bound API policy refuses, and no reference beyond netstandard and the two
+  engine DLLs;
+- the Client and the Editor: none of the members that policy bans;
+- the Client: no member of the rules engine's types, no `ToString`, `Parse` or `TryParse` of a
+  number type, no `String.Format`, no `String.Concat` of objects, no `Convert.ToString`, and no
+  `Color` or `Color32` constructed;
+- each run's report: at least one test, every test passed, none skipped, and the culture guard
+  among them; each run's log: no compiler warning about a file under `Assets/CoveredLot` or
+  `Assets/Tests`.
+
+These rules name types and members, so they show that the code uses none of those, not that it
+makes no culture-dependent text: the comments of `UnityBoundApiPolicy` and `ClientRules` in
+`dotnet/Shared` list what passes them. Whether Unity applied Core's overflow checks is not
+checked yet.

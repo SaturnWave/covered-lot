@@ -1,0 +1,30 @@
+{
+    "name": "CoveredLot.Tests.EditMode",
+    "rootNamespace": "CoveredLot.Tests.EditMode",
+    "references": [
+        "CoveredLot.Core",
+        "CoveredLot.Client",
+        "CoveredLot.Editor",
+        "CoveredLot.Tests.Support",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner",
+        "Unity.UI.TestFramework.Runtime"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll",
+        "PuzzleCore.dll",
+        "PuzzleCore.Jam.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

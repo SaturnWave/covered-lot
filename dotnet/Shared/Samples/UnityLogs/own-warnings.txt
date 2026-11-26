@@ -1,0 +1,7 @@
+Doctored for UnityEditorLogTests, in the form of lines from a Unity editor log: three warnings about our code among a package's.
+[ScriptCompilation] Requested script compilation because: Assetdatabase observed changes in script compilation related files
+Library/PackageCache/com.unity.inputsystem@0123456789ab/InputSystem/Example.cs(42,13): warning CS0168: The variable 'unused' is declared but never used
+Assets/CoveredLot/Client/GameRoot.cs(31,17): warning CS0168: The variable 'unused' is declared but never used
+Assets/Tests/EditMode/CoreInUnityTests.cs(12,20): warning CS0219: The variable 'value' is assigned but its value is never used
+Assets\CoveredLot\Core\Copy.cs(9,13): warning CS0414: The field 'Copy.spare' is assigned but its value is never used
+Refreshing native plugins compatible for Editor in 0.42 ms. Found 0 plugins.

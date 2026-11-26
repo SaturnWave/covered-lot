@@ -39,8 +39,6 @@ namespace CoveredLot.Core.Tests
         private const string CleanSample = Samples + "CleanSample";
         private const string CoreFolder = "Assets/CoveredLot/Core";
 
-        private static readonly string[] RandomTypes = { "System.Random", "UnityEngine.Random" };
-
         /// <summary>
         /// The keyword that opens an unchecked context. It also matches in comments and strings: telling those apart
         /// from code takes a C# lexer, and Core's comments and copy can say it another way.
@@ -77,7 +75,7 @@ namespace CoveredLot.Core.Tests
         {
             using var core = CoreScanner();
 
-            IReadOnlyList<string> referenced = RandomTypes.Where(core.References).ToList();
+            IReadOnlyList<string> referenced = CodeHygiene.RandomTypeReferences(core);
 
             Assert.True(referenced.Count == 0, "CoveredLot.Core references " + string.Join(" and ", referenced) + ".");
         }
@@ -183,7 +181,7 @@ namespace CoveredLot.Core.Tests
         {
             using var samples = SampleScanner();
 
-            Assert.True(samples.References("System.Random"));
+            Assert.Equal(new[] { "System.Random" }, CodeHygiene.RandomTypeReferences(samples));
             Assert.Contains(samples.MemberReferences(), site =>
                 site.CallerType == RandomSample && site.CallerMethod == "RollADie" && site.DeclaringType == "System.Random");
         }
@@ -236,7 +234,7 @@ namespace CoveredLot.Core.Tests
                 .Concat(samples.ReassignableStaticFields())
                 .Where(violation => IsIn(violation.Location, CleanSample));
             IEnumerable<MemberReferenceSite> randomUses = samples.MemberReferences()
-                .Where(site => IsIn(site.CallerType, CleanSample) && RandomTypes.Contains(site.DeclaringType, StringComparer.Ordinal));
+                .Where(site => IsIn(site.CallerType, CleanSample) && CodeHygiene.RandomTypes.Contains(site.DeclaringType, StringComparer.Ordinal));
             IReadOnlyList<string> findings = violations.Select(violation => violation.ToString())
                 .Concat(randomUses.Select(site => site.ToString()))
                 .ToList();

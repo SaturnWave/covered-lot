@@ -29,6 +29,8 @@ must_be_ignored=(
   dotnet/CoveredLot.Core/bin/x
   dotnet/CoveredLot.Core/obj/x
   dotnet/CoveredLot.Core.Tests/bin/Release/x.dll
+  dotnet/CoveredLot.UnityChecks/bin/Release/x.dll
+  dotnet/CoveredLot.UnityChecks/obj/x
   CoveredLot.Core.csproj
   Assembly-CSharp.csproj
   covered-lot.sln
@@ -48,6 +50,11 @@ done
 must_be_tracked=(
   dotnet/CoveredLot.Core/CoveredLot.Core.csproj
   dotnet/CoveredLot.Core.Tests/CoveredLot.Core.Tests.csproj
+  dotnet/CoveredLot.UnityChecks/CoveredLot.UnityChecks.csproj
+  dotnet/Shared/Samples/UnityReports/passed.xml
+  dotnet/Shared/Samples/UnityLogs/clean.txt
+  Assets/Tests/EditMode/CoreInUnityTests.cs
+  Assets/Tests/Support/csc.rsp
   Assets/CoveredLot/Editor/Build/Probe.cs
   Assets/CoveredLot/Logs/Probe.cs
   Assets/Generated/PuzzleCore/PuzzleCore.dll

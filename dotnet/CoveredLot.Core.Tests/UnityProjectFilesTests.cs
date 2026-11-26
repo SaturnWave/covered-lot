@@ -15,12 +15,12 @@ namespace CoveredLot.Core.Tests
     /// System as the only active input handling; entering Play mode reloads the domain and the scene; the engine DLLs
     /// are referenced only by the assemblies that name them and have their references validated; the URP asset is
     /// saved in the form of the pinned URP, which would otherwise rewrite it in any editor session that does not quit
-    /// at once; the package manifest holds no local package, none of the template's authoring packages, the pinned test
-    /// frameworks and the UI Toolkit module; and every Assets path that a project setting names exists. Because the
+    /// at once; the package manifest holds no local package, none of the packages design section 12 removes, the
+    /// pinned test frameworks and the UI Toolkit module; and every Assets path that a project setting names exists. Because the
     /// repository is public, the project is also linked to no Unity Cloud project, keeps no keystore of its own,
     /// keeps the package policy that was decoded and reviewed, and holds no drive-letter path or user folder in any
-    /// text file. The other settings that ProjectSetup applies through the PlayerSettings API are pinned inside Unity
-    /// (piece 10).
+    /// text file. The other settings that ProjectSetup applies through the PlayerSettings API are pinned inside Unity, by
+    /// the EditMode SettingsGuardTests.
     /// </summary>
     public sealed class UnityProjectFilesTests
     {
@@ -51,7 +51,7 @@ namespace CoveredLot.Core.Tests
         private static readonly ProjectFile UrpAssetFile = new("Assets/Settings/UniversalRP.asset");
         private static readonly ProjectFile ManifestFile = new("Packages/manifest.json");
 
-        /// <summary>The template's authoring packages, which design section 12 removes.</summary>
+        /// <summary>The packages design section 12 removes: the template's authoring packages, and one that -createProject adds.</summary>
         private static readonly string[] RemovedPackages =
         {
             "com.unity.collab-proxy",
@@ -63,6 +63,9 @@ namespace CoveredLot.Core.Tests
             "com.unity.2d.tilemap.extras",
             "com.unity.2d.aseprite",
             "com.unity.2d.tooling",
+            // Added by -createProject, not by the template. Nothing in the game uses it, and its runtime assembly,
+            // Unity.Multiplayer.Center.Common, is built for every platform, so a player build would carry it.
+            "com.unity.multiplayer.center",
         };
 
         /// <summary>The folders Unity reads the project from.</summary>
@@ -144,7 +147,7 @@ namespace CoveredLot.Core.Tests
         }
 
         [Fact]
-        public void The_manifest_has_none_of_the_removed_authoring_packages()
+        public void The_manifest_has_none_of_the_removed_packages()
         {
             IReadOnlyDictionary<string, string> dependencies = ManifestDependencies();
 

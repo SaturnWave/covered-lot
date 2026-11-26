@@ -12,14 +12,17 @@ using Xunit;
 namespace CoveredLot.Core.Tests
 {
     /// <summary>
-    /// The Unity side of the compile rules (design sections 3, 8.1 and 10a). The three CoveredLot assemblies are Core,
+    /// The Unity side of the compile rules (design sections 3, 8.1, 8.7 and 10a). The three CoveredLot assemblies are Core,
     /// the Client and the Editor, and each asmdef is pinned property by property: Core's keeps it Unity-free and lets it
     /// see only the two engine DLLs, and the .NET build of Core references no more; the Client's and the Editor's
-    /// override the precompiled references with none, so neither compiles against the engine DLLs. No assembly allows
-    /// unsafe code, and every CoveredLot assembly carries its own csc.rsp, because a csc.rsp at the Assets root would
-    /// apply to every package as well. Unity and the .NET build compile the same files into Core: the .NET build takes
-    /// every .cs under Assets/CoveredLot/Core, so no other asmdef or asmref may move files in or out of Core in Unity,
-    /// and no source may sit where Unity does not import it.
+    /// override the precompiled references with none, so neither compiles against the engine DLLs. The three test
+    /// assemblies under Assets/Tests (Support, EditMode and PlayMode) are pinned the same way: each is built only with the
+    /// tests (UNITY_INCLUDE_TESTS), referenced by no assembly that does not name it, and given NUnit, and the engine DLLs
+    /// where its tests call the engine, by name. No other asmdef may sit under Assets/CoveredLot or Assets/Tests. No
+    /// assembly allows unsafe code, and every assembly of both folders carries its own csc.rsp, because a csc.rsp at the
+    /// Assets root would apply to every package as well. Unity and the .NET build compile the same files into Core: the
+    /// .NET build takes every .cs under Assets/CoveredLot/Core, so no other asmdef or asmref may move files in or out of
+    /// Core in Unity, and no source may sit where Unity does not import it.
     /// </summary>
     public sealed class AsmdefGuardTests
     {
@@ -28,6 +31,10 @@ namespace CoveredLot.Core.Tests
         private const string CoreAsmdef = CoreFolder + "/CoveredLot.Core.asmdef";
         private const string ClientAsmdef = CoveredLotFolder + "/Client/CoveredLot.Client.asmdef";
         private const string EditorAsmdef = CoveredLotFolder + "/Editor/CoveredLot.Editor.asmdef";
+        private const string TestsFolder = "Assets/Tests";
+        private const string SupportAsmdef = TestsFolder + "/Support/CoveredLot.Tests.Support.asmdef";
+        private const string EditModeAsmdef = TestsFolder + "/EditMode/CoveredLot.Tests.EditMode.asmdef";
+        private const string PlayModeAsmdef = TestsFolder + "/PlayMode/CoveredLot.Tests.PlayMode.asmdef";
         private const string CoreAssembly = "CoveredLot.Core";
 
         /// <summary>The assembly every netstandard2.1 library references; Unity gives it to every assembly as well.</summary>
@@ -96,7 +103,62 @@ namespace CoveredLot.Core.Tests
             ["noEngineReferences"] = "false",
         };
 
-        /// <summary>The csc.rsp options of every CoveredLot assembly; Core also checks overflow, like its .NET build.</summary>
+        /// <summary>
+        /// The test support assembly: [HostileCulture], TestCulture and the culture guard both test assemblies run. It is
+        /// built for every platform, because the PlayMode tests use it, and only with the tests.
+        /// </summary>
+        private static readonly IReadOnlyDictionary<string, string> ExpectedSupportAsmdef = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["name"] = "\"CoveredLot.Tests.Support\"",
+            ["rootNamespace"] = "\"CoveredLot.Tests.Support\"",
+            ["references"] = "[\"UnityEngine.TestRunner\"]",
+            ["includePlatforms"] = "[]",
+            ["excludePlatforms"] = "[]",
+            ["allowUnsafeCode"] = "false",
+            ["overrideReferences"] = "true",
+            ["precompiledReferences"] = "[\"nunit.framework.dll\"]",
+            ["autoReferenced"] = "false",
+            ["defineConstraints"] = "[\"UNITY_INCLUDE_TESTS\"]",
+            ["versionDefines"] = "[]",
+            ["noEngineReferences"] = "false",
+        };
+
+        /// <summary>The EditMode tests: editor only, with the three CoveredLot assemblies, and the engine DLLs for the Core checks.</summary>
+        private static readonly IReadOnlyDictionary<string, string> ExpectedEditModeAsmdef = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["name"] = "\"CoveredLot.Tests.EditMode\"",
+            ["rootNamespace"] = "\"CoveredLot.Tests.EditMode\"",
+            ["references"] = "[\"CoveredLot.Core\",\"CoveredLot.Client\",\"CoveredLot.Editor\",\"CoveredLot.Tests.Support\","
+                + "\"UnityEngine.TestRunner\",\"UnityEditor.TestRunner\",\"Unity.UI.TestFramework.Runtime\"]",
+            ["includePlatforms"] = "[\"Editor\"]",
+            ["excludePlatforms"] = "[]",
+            ["allowUnsafeCode"] = "false",
+            ["overrideReferences"] = "true",
+            ["precompiledReferences"] = "[\"nunit.framework.dll\",\"PuzzleCore.dll\",\"PuzzleCore.Jam.dll\"]",
+            ["autoReferenced"] = "false",
+            ["defineConstraints"] = "[\"UNITY_INCLUDE_TESTS\"]",
+            ["versionDefines"] = "[]",
+            ["noEngineReferences"] = "false",
+        };
+
+        /// <summary>The PlayMode tests: every platform, Core and the Client but not the Editor, and no engine DLL.</summary>
+        private static readonly IReadOnlyDictionary<string, string> ExpectedPlayModeAsmdef = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["name"] = "\"CoveredLot.Tests.PlayMode\"",
+            ["rootNamespace"] = "\"CoveredLot.Tests.PlayMode\"",
+            ["references"] = "[\"CoveredLot.Core\",\"CoveredLot.Client\",\"CoveredLot.Tests.Support\",\"UnityEngine.TestRunner\",\"Unity.UI.TestFramework.Runtime\"]",
+            ["includePlatforms"] = "[]",
+            ["excludePlatforms"] = "[]",
+            ["allowUnsafeCode"] = "false",
+            ["overrideReferences"] = "true",
+            ["precompiledReferences"] = "[\"nunit.framework.dll\"]",
+            ["autoReferenced"] = "false",
+            ["defineConstraints"] = "[\"UNITY_INCLUDE_TESTS\"]",
+            ["versionDefines"] = "[]",
+            ["noEngineReferences"] = "false",
+        };
+
+        /// <summary>The csc.rsp options of every CoveredLot assembly, the tests' included; Core also checks overflow, like its .NET build.</summary>
         private static readonly string[] OptionsOfEveryAssembly = { "-warnaserror+", "-nullable:enable" };
         private const string CoreOnlyOption = "-checked+";
 
@@ -121,6 +183,24 @@ namespace CoveredLot.Core.Tests
             AssertAsmdefHolds(EditorAsmdef, ExpectedEditorAsmdef);
         }
 
+        [Fact]
+        public void The_test_support_asmdef_is_built_only_with_the_tests_for_every_platform()
+        {
+            AssertAsmdefHolds(SupportAsmdef, ExpectedSupportAsmdef);
+        }
+
+        [Fact]
+        public void The_edit_mode_test_asmdef_is_editor_only_and_names_the_engine_dlls_its_tests_call()
+        {
+            AssertAsmdefHolds(EditModeAsmdef, ExpectedEditModeAsmdef);
+        }
+
+        [Fact]
+        public void The_play_mode_test_asmdef_references_Core_the_Client_and_the_support_and_no_engine_dll()
+        {
+            AssertAsmdefHolds(PlayModeAsmdef, ExpectedPlayModeAsmdef);
+        }
+
         /// <summary>An asmdef that this class does not pin would be an assembly whose references nothing checks.</summary>
         [Fact]
         public void The_CoveredLot_folder_holds_the_Core_Client_and_Editor_asmdefs_only()
@@ -128,6 +208,14 @@ namespace CoveredLot.Core.Tests
             IReadOnlyList<string> asmdefs = Sorted(FilesWithExtension(CoveredLotFolder, ".asmdef").Select(path => RepositoryLayout.Relative(path)));
 
             Assert.Equal(Sorted(new[] { CoreAsmdef, ClientAsmdef, EditorAsmdef }), asmdefs);
+        }
+
+        [Fact]
+        public void The_Tests_folder_holds_the_Support_EditMode_and_PlayMode_asmdefs_only()
+        {
+            IReadOnlyList<string> asmdefs = Sorted(FilesWithExtension(TestsFolder, ".asmdef").Select(path => RepositoryLayout.Relative(path)));
+
+            Assert.Equal(Sorted(new[] { SupportAsmdef, EditModeAsmdef, PlayModeAsmdef }), asmdefs);
         }
 
         /// <summary>
@@ -204,9 +292,9 @@ namespace CoveredLot.Core.Tests
         }
 
         [Fact]
-        public void Every_CoveredLot_asmdef_folder_has_a_csc_rsp_with_exactly_the_approved_options()
+        public void Every_asmdef_folder_of_the_game_and_its_tests_has_a_csc_rsp_with_exactly_the_approved_options()
         {
-            IReadOnlyList<string> asmdefs = FilesWithExtension("Assets/CoveredLot", ".asmdef");
+            IReadOnlyList<string> asmdefs = FilesWithExtension(CoveredLotFolder, ".asmdef").Concat(FilesWithExtension(TestsFolder, ".asmdef")).ToList();
             var problems = new List<string>();
             foreach (string asmdef in asmdefs)
             {
@@ -226,7 +314,8 @@ namespace CoveredLot.Core.Tests
                 }
             }
 
-            Assert.NotEmpty(asmdefs);
+            Assert.Contains(asmdefs, asmdef => RepositoryLayout.Relative(asmdef).StartsWith(TestsFolder + "/", StringComparison.Ordinal));
+            Assert.Contains(asmdefs, asmdef => RepositoryLayout.Relative(asmdef).StartsWith(CoveredLotFolder + "/", StringComparison.Ordinal));
             Assert.True(problems.Count == 0, string.Join("\n", problems));
         }
 

@@ -115,6 +115,35 @@ namespace CoveredLot.Shared
     }
 
     /// <summary>
+    /// One member a method body names, with where it names it and the member's signature (see
+    /// <see cref="AssemblyScanner.LocatedMemberUses"/>), for rules that judge a member by its overload.
+    /// </summary>
+    internal sealed record LocatedMemberUse
+    {
+        /// <summary>The method and IL offset, for example "CoveredLot.Client.X::Run+IL_0004".</summary>
+        public required string Location { get; init; }
+
+        public required MemberUse Use { get; init; }
+
+        public override string ToString() => Location + ": " + Use.Display;
+    }
+
+    /// <summary>
+    /// One struct a method body sets to its default value with initobj (see <see cref="AssemblyScanner.DefaultedStructs"/>),
+    /// for example UnityEngine.Color for <c>new Color()</c>.
+    /// </summary>
+    internal sealed record DefaultedStruct
+    {
+        /// <summary>The method and IL offset, for example "CoveredLot.Client.X::Run+IL_0004".</summary>
+        public required string Location { get; init; }
+
+        /// <summary>The struct's name, generic arguments stripped.</summary>
+        public required string TypeName { get; init; }
+
+        public override string ToString() => Location + ": default " + TypeName;
+    }
+
+    /// <summary>
     /// One external type that a type definition names in its declarations (see
     /// <see cref="AssemblyScanner.DeclaredExternalTypes"/>), for example System.Collections.Generic.IReadOnlyList`1.
     /// </summary>
@@ -137,9 +166,10 @@ namespace CoveredLot.Shared
     /// port of the engine's AssemblyInspection (SaturnWave/puzzle-engine, tests/PuzzleCore.Tests/Support/AssemblyInspection.cs):
     /// its catch regions, type, member and assembly references, floating-point scan and platform-API policy walk, with the
     /// signature shapes and the stack-flow walk by which the policies judge each call. The engine's list of type mentions,
-    /// which only its bot guard uses, is left out. Four scans of this repository's own are added: every catch block
-    /// (Core has none at all), async state machines, static fields that can be reassigned, and the external types each
-    /// type declares.
+    /// which only its bot guard uses, is left out. Six scans of this repository's own are added: every catch block
+    /// (Core has none at all), async state machines, static fields that can be reassigned, the external types each type
+    /// declares, the members each method body names with their signatures and IL offsets, and the structs set to their
+    /// default value (the last two serve the Client's own rules, <see cref="ClientRules"/>).
     /// </summary>
     internal sealed class AssemblyScanner : IDisposable
     {
@@ -180,8 +210,9 @@ namespace CoveredLot.Shared
 
         /// <summary>
         /// The assemblies whose types are no platform APIs: the Unity-free Core and the two engine DLLs it is built against.
-        /// Each is checked on its own: Core by the API policy tests, the engine's DLLs by the engine's own guard tests at the
-        /// commit they were synced from. The engine reads its list from its project table; this one is written out.
+        /// Each is checked on its own: Core's .NET build by the API policy tests and Unity's build of it by UnityChecks, the
+        /// engine's DLLs by the engine's own guard tests at the commit they were synced from. The engine reads its list from
+        /// its project table; this one is written out.
         /// </summary>
         private static readonly IReadOnlySet<string> SiblingAssemblyNames = new HashSet<string>(StringComparer.Ordinal)
         {
@@ -417,6 +448,49 @@ namespace CoveredLot.Shared
                     .SelectMany(shape => shape.ExternalTypes)
                     .Distinct(StringComparer.Ordinal)
                     .Select(external => new DeclaredTypeUse { DeclaringType = typeName, ExternalType = external }));
+            }
+
+            return found;
+        }
+
+        /// <summary>
+        /// Every member that every method body names, as <see cref="MemberReferences"/> finds them (calls, field accesses and
+        /// member tokens), each with its IL offset and its signature: the declaring type with its generic arguments and the
+        /// parameter types, so that a rule can tell one overload from another. Unlike the policy walk it tracks no stack, so it
+        /// knows nothing of the values passed.
+        /// </summary>
+        public IReadOnlyList<LocatedMemberUse> LocatedMemberUses()
+        {
+            var found = new List<LocatedMemberUse>();
+            foreach (MethodDefinitionHandle methodHandle in AllMethods())
+            {
+                string method = Describe(methodHandle);
+                foreach (Instruction instruction in Instructions(methodHandle).Where(instruction => !instruction.Operand.IsNil))
+                {
+                    if (MemberUseOf(instruction.Operand) is MemberUse use)
+                    {
+                        found.Add(new LocatedMemberUse { Location = At(method, instruction.Offset), Use = use });
+                    }
+                }
+            }
+
+            return found;
+        }
+
+        /// <summary>
+        /// Every struct that a method body sets to its default value with initobj: <c>default(S)</c>, or <c>new S()</c> for a
+        /// struct without a parameterless constructor, neither of which names a constructor. A struct field or array element
+        /// that is never written keeps its default without any instruction, so it is not seen here.
+        /// </summary>
+        public IReadOnlyList<DefaultedStruct> DefaultedStructs()
+        {
+            var found = new List<DefaultedStruct>();
+            foreach (MethodDefinitionHandle methodHandle in AllMethods())
+            {
+                string method = Describe(methodHandle);
+                found.AddRange(Instructions(methodHandle)
+                    .Where(instruction => instruction.OpCode == OpCodes.Initobj)
+                    .Select(instruction => new DefaultedStruct { Location = At(method, instruction.Offset), TypeName = ShapeOf(instruction.Operand).DefinitionName }));
             }
 
             return found;
