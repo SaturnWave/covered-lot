@@ -1,6 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
+using CoveredLot.Core.Tests.Support;
 using CoveredLot.Shared;
 using Xunit;
 
@@ -8,10 +12,16 @@ namespace CoveredLot.Core.Tests
 {
     /// <summary>
     /// Rules of the code standard that the compiler does not fully enforce, checked on the .NET build of the Unity-free
-    /// Core: no generic, bare, filtered or empty catch (CA1031 misses the filtered and empty ones), no System.Random or
-    /// UnityEngine.Random, no async state machine, and no arithmetic that wraps silently on overflow. The self-tests
-    /// prove that the scanner sees each planted form in the samples compiled into this assembly and stays silent on
-    /// the clean sample, as the engine's guard tests do.
+    /// Core: no catch block at all, so none of the generic, bare, filtered or empty ones that CA1031 partly misses; no
+    /// System.Random or UnityEngine.Random; no async state machine; and no static field that can be reassigned. The
+    /// self-tests prove that the scanner sees each planted form in the samples compiled into this assembly and stays
+    /// silent on the clean sample, as the engine's guard tests do.
+    ///
+    /// Overflow is checked on the sources instead. Core compiles with overflow checks on (CheckForOverflowUnderflow in
+    /// the .NET build and -checked+ in Unity, both pinned), so the integer arithmetic and numeric conversions it writes
+    /// can wrap only inside an unchecked context, and no Core source may open one. The IL cannot show this: the
+    /// compiler's own lowering of a foreach over an array, of a switch over an enum that starts at 1 or of an index
+    /// from the end emits a plain add or sub that cannot overflow.
     /// </summary>
     public sealed class HygieneTests
     {
@@ -19,10 +29,17 @@ namespace CoveredLot.Core.Tests
         private const string ForbiddenCatchSample = Samples + "ForbiddenCatchSample";
         private const string RandomSample = Samples + "RandomSample";
         private const string AsyncSample = Samples + "AsyncSample";
-        private const string UncheckedArithmeticSample = Samples + "UncheckedArithmeticSample";
+        private const string MutableStaticSample = Samples + "MutableStaticSample";
         private const string CleanSample = Samples + "CleanSample";
+        private const string CoreFolder = "Assets/CoveredLot/Core";
 
         private static readonly string[] RandomTypes = { "System.Random", "UnityEngine.Random" };
+
+        /// <summary>
+        /// The keyword that opens an unchecked context. It also matches in comments and strings: telling those apart
+        /// from code takes a C# lexer, and Core's comments and copy can say it another way.
+        /// </summary>
+        private static readonly Regex UncheckedKeyword = new(@"\bunchecked\b", RegexOptions.CultureInvariant);
 
         [Fact]
         public void Core_has_no_generic_bare_filtered_or_empty_catch_block()
@@ -30,6 +47,16 @@ namespace CoveredLot.Core.Tests
             using var core = CoreScanner();
 
             IReadOnlyList<Violation> violations = core.GenericOrEmptyCatchBlocks();
+
+            Assert.True(violations.Count == 0, Report(violations));
+        }
+
+        [Fact]
+        public void Core_has_no_catch_block_at_all()
+        {
+            using var core = CoreScanner();
+
+            IReadOnlyList<Violation> violations = core.CatchBlocks();
 
             Assert.True(violations.Count == 0, Report(violations));
         }
@@ -55,13 +82,25 @@ namespace CoveredLot.Core.Tests
         }
 
         [Fact]
-        public void Core_has_no_unchecked_addition_subtraction_or_multiplication()
+        public void Core_has_no_static_field_that_can_be_reassigned()
         {
             using var core = CoreScanner();
 
-            IReadOnlyList<Violation> violations = core.UncheckedArithmetic();
+            IReadOnlyList<Violation> violations = core.ReassignableStaticFields();
 
             Assert.True(violations.Count == 0, Report(violations));
+        }
+
+        [Fact]
+        public void No_Core_source_opens_an_unchecked_context()
+        {
+            IReadOnlyList<string> sources = CoreSources();
+
+            IReadOnlyList<string> uncheckedLines = sources.SelectMany(UncheckedLines).ToList();
+
+            Assert.NotEmpty(sources);
+            Assert.True(uncheckedLines.Count == 0,
+                "Core keeps its overflow checks; these lines name unchecked:\n" + string.Join("\n", uncheckedLines));
         }
 
         [Theory]
@@ -78,6 +117,22 @@ namespace CoveredLot.Core.Tests
             Assert.Contains(violations, violation =>
                 violation.Location.StartsWith(ForbiddenCatchSample + "::" + method + "+IL_", StringComparison.Ordinal)
                 && violation.Reason == reason);
+        }
+
+        /// <summary>Core's stricter rule also reports the specific catch that the clean sample is allowed to keep.</summary>
+        [Theory]
+        [InlineData(ForbiddenCatchSample, "CatchesEverything")]
+        [InlineData(ForbiddenCatchSample, "BareCatch")]
+        [InlineData(ForbiddenCatchSample, "CatchesEverythingWithAFilter")]
+        [InlineData(ForbiddenCatchSample, "SwallowsSilently")]
+        [InlineData(CleanSample, "ParseOrExplain")]
+        public void The_scanner_reports_every_catch_block_for_Core(string type, string method)
+        {
+            using var samples = SampleScanner();
+
+            IReadOnlyList<Violation> violations = samples.CatchBlocks();
+
+            Assert.Contains(violations, violation => violation.Location.StartsWith(type + "::" + method + "+IL_", StringComparison.Ordinal));
         }
 
         [Fact]
@@ -99,18 +154,33 @@ namespace CoveredLot.Core.Tests
         }
 
         [Theory]
-        [InlineData("AddsWithoutCheck", "unchecked add")]
-        [InlineData("SubtractsWithoutCheck", "unchecked sub")]
-        [InlineData("MultipliesWithoutCheck", "unchecked mul")]
-        public void The_scanner_reports_each_planted_unchecked_operation(string method, string reason)
+        [InlineData("_count")]
+        [InlineData("<Total>k__BackingField")]
+        public void The_scanner_reports_each_planted_reassignable_static_field(string field)
         {
             using var samples = SampleScanner();
 
-            IReadOnlyList<Violation> violations = samples.UncheckedArithmetic();
+            IReadOnlyList<Violation> violations = samples.ReassignableStaticFields();
 
-            Assert.Contains(violations, violation =>
-                violation.Location.StartsWith(UncheckedArithmeticSample + "::" + method + "+IL_", StringComparison.Ordinal)
-                && violation.Reason == reason);
+            Assert.Contains(violations, violation => violation.Location == MutableStaticSample + "::" + field);
+        }
+
+        [Theory]
+        [InlineData("int sum = unchecked(first + second);")]
+        [InlineData("unchecked { total *= step; }")]
+        [InlineData("short low = unchecked((short)value);")]
+        public void The_source_scan_reports_each_planted_unchecked_context(string line)
+        {
+            Assert.Matches(UncheckedKeyword, line);
+        }
+
+        [Theory]
+        [InlineData("int sum = checked(first + second);")]
+        [InlineData("int total = first + second;")]
+        [InlineData("int uncheckedTotal = total;")]
+        public void The_source_scan_passes_checked_code_and_longer_words(string line)
+        {
+            Assert.DoesNotMatch(UncheckedKeyword, line);
         }
 
         [Fact]
@@ -120,7 +190,7 @@ namespace CoveredLot.Core.Tests
 
             IEnumerable<Violation> violations = samples.GenericOrEmptyCatchBlocks()
                 .Concat(samples.AsyncStateMachines())
-                .Concat(samples.UncheckedArithmetic())
+                .Concat(samples.ReassignableStaticFields())
                 .Where(violation => IsIn(violation.Location, CleanSample));
             IEnumerable<MemberReferenceSite> randomUses = samples.MemberReferences()
                 .Where(site => IsIn(site.CallerType, CleanSample) && RandomTypes.Contains(site.DeclaringType, StringComparer.Ordinal));
@@ -136,6 +206,18 @@ namespace CoveredLot.Core.Tests
 
         /// <summary>This test assembly, which compiles the planted samples of dotnet/Shared/Samples.</summary>
         private static AssemblyScanner SampleScanner() => new(typeof(HygieneTests).Assembly.Location);
+
+        /// <summary>The files the .NET build compiles into Core.</summary>
+        private static IReadOnlyList<string> CoreSources() => Directory
+            .EnumerateFiles(RepositoryLayout.FullPath(CoreFolder), "*.cs", SearchOption.AllDirectories)
+            .Where(path => string.Equals(Path.GetExtension(path), ".cs", StringComparison.Ordinal))
+            .ToList();
+
+        /// <summary>Each line of the source that names unchecked, as path:line.</summary>
+        private static IEnumerable<string> UncheckedLines(string source) => File.ReadAllLines(source)
+            .Select((text, index) => (Text: text, Number: index + 1))
+            .Where(line => UncheckedKeyword.IsMatch(line.Text))
+            .Select(line => RepositoryLayout.Relative(source) + ":" + line.Number.ToString(CultureInfo.InvariantCulture));
 
         /// <summary>Whether a location or type name lies in the type or in a type nested in it (a state machine, a closure).</summary>
         private static bool IsIn(string location, string type) =>

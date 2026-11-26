@@ -33,14 +33,14 @@ namespace CoveredLot.Shared
     /// Reads a compiled assembly's metadata and IL without loading it, to prove rules the compiler cannot enforce.
     /// Everything is checked on the compiled output, so a rule cannot be dodged with var, generics or a helper
     /// method. A trimmed port of the engine's AssemblyInspection (SaturnWave/puzzle-engine,
-    /// tests/PuzzleCore.Tests/Support/AssemblyInspection.cs): its catch regions, type and member references and IL
-    /// opcode walk are kept; its floating-point, platform-API and stack-flow checks are left out.
+    /// tests/PuzzleCore.Tests/Support/AssemblyInspection.cs): its catch regions, type, member and assembly references
+    /// and IL opcode walk are kept; its floating-point, platform-API and stack-flow checks are left out. Two rules of
+    /// Core's own are added: no catch block at all, and no static field that can be reassigned.
     /// </summary>
     internal sealed class AssemblyScanner : IDisposable
     {
         private const string CompilerGeneratedAttribute = "System.Runtime.CompilerServices.CompilerGeneratedAttribute";
         private const string AsyncStateMachineInterface = "System.Runtime.CompilerServices.IAsyncStateMachine";
-        private const string PrivateImplementationDetails = "<PrivateImplementationDetails>";
 
         private static readonly IReadOnlyDictionary<short, OpCode> OpCodesByValue = typeof(OpCodes)
             .GetFields(BindingFlags.Public | BindingFlags.Static)
@@ -53,12 +53,6 @@ namespace CoveredLot.Shared
         {
             OpCodes.Nop, OpCodes.Pop, OpCodes.Leave, OpCodes.Leave_S,
             OpCodes.Stloc, OpCodes.Stloc_S, OpCodes.Stloc_0, OpCodes.Stloc_1, OpCodes.Stloc_2, OpCodes.Stloc_3,
-        }.Select(opCode => opCode.Value).ToHashSet();
-
-        /// <summary>Integer arithmetic that wraps on overflow. Checked code compiles to add.ovf, sub.ovf and mul.ovf instead.</summary>
-        private static readonly IReadOnlySet<short> UncheckedArithmeticOpCodes = new[]
-        {
-            OpCodes.Add, OpCodes.Sub, OpCodes.Mul,
         }.Select(opCode => opCode.Value).ToHashSet();
 
         private readonly PEReader _peReader;
@@ -88,6 +82,12 @@ namespace CoveredLot.Shared
         }
 
         public void Dispose() => _peReader.Dispose();
+
+        /// <summary>The names of the assemblies this one references (netstandard, PuzzleCore, ...), sorted ordinally.</summary>
+        public IReadOnlyList<string> ReferencedAssemblyNames() => _reader.AssemblyReferences
+            .Select(handle => _reader.GetString(_reader.GetAssemblyReference(handle).Name))
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToList();
 
         /// <summary>Whether the assembly's type reference table names the type, for example System.Random.</summary>
         public bool References(string typeFullName) =>
@@ -119,28 +119,15 @@ namespace CoveredLot.Shared
         /// Catch blocks that swallow everything (catch (Exception), a bare catch, or such a catch with a when-filter)
         /// and catch blocks with an empty body. CA1031 misses the filtered and the empty ones.
         /// </summary>
-        public IReadOnlyList<Violation> GenericOrEmptyCatchBlocks()
-        {
-            var found = new List<Violation>();
-            foreach (MethodDefinitionHandle methodHandle in AllMethods())
-            {
-                MethodDefinition method = _reader.GetMethodDefinition(methodHandle);
-                if (method.RelativeVirtualAddress == 0)
-                {
-                    continue;
-                }
+        public IReadOnlyList<Violation> GenericOrEmptyCatchBlocks() => Handlers().SelectMany(CatchViolations).Distinct().ToList();
 
-                MethodBodyBlock body = _peReader.GetMethodBody(method.RelativeVirtualAddress);
-                byte[] il = body.GetILBytes() ?? Array.Empty<byte>();
-                string location = Describe(methodHandle);
-                foreach (ExceptionRegion region in body.ExceptionRegions)
-                {
-                    found.AddRange(CatchViolations(region, il, location));
-                }
-            }
-
-            return found.Distinct().ToList();
-        }
+        /// <summary>
+        /// Every catch block, whatever it catches, with or without a when-filter: Core has none at all. The finally
+        /// blocks that using, foreach and lock compile to are no catch blocks and are not reported.
+        /// </summary>
+        public IReadOnlyList<Violation> CatchBlocks() => Handlers()
+            .Select(handler => new Violation(At(handler.Location, handler.Region.HandlerOffset), DescribeCatch(handler.Region)))
+            .ToList();
 
         /// <summary>
         /// The state machines the compiler writes for async methods: types that implement IAsyncStateMachine. Each
@@ -152,38 +139,53 @@ namespace CoveredLot.Shared
             .ToList();
 
         /// <summary>
-        /// Every add, sub and mul instruction: integer arithmetic that wraps silently on overflow, where checked code
-        /// compiles to add.ovf, sub.ovf and mul.ovf. The compiler-written &lt;PrivateImplementationDetails&gt; type
-        /// (the string hash of a switch on strings, for example) is left out.
+        /// Static fields that can be reassigned, being neither const nor readonly; a static auto-property with a
+        /// setter has one as its backing field. Core keeps no mutable static state, and this is how such state gets
+        /// in (a readonly field that holds a mutable object is not seen here). The lambda caches the compiler writes
+        /// are fields of compiler-written types and are left out.
         /// </summary>
-        public IReadOnlyList<Violation> UncheckedArithmetic()
+        public IReadOnlyList<Violation> ReassignableStaticFields()
         {
             var found = new List<Violation>();
-            foreach (MethodDefinitionHandle methodHandle in AllMethods())
+            foreach (TypeDefinitionHandle typeHandle in _reader.TypeDefinitions.Where(type => !IsCompilerWritten(type)))
             {
-                if (IsInPrivateImplementationDetails(_reader.GetMethodDefinition(methodHandle).GetDeclaringType()))
-                {
-                    continue;
-                }
-
-                string location = Describe(methodHandle);
-                found.AddRange(Instructions(methodHandle)
-                    .Where(instruction => UncheckedArithmeticOpCodes.Contains(instruction.OpCode.Value))
-                    .Select(instruction => new Violation(At(location, instruction.Offset), "unchecked " + instruction.OpCode.Name)));
+                string typeName = FullName(typeHandle);
+                found.AddRange(_reader.GetTypeDefinition(typeHandle).GetFields()
+                    .Select(_reader.GetFieldDefinition)
+                    .Where(IsReassignableStatic)
+                    .Select(field => new Violation(typeName + "::" + _reader.GetString(field.Name), "static field that can be reassigned")));
             }
 
             return found;
         }
 
-        private IEnumerable<Violation> CatchViolations(ExceptionRegion region, byte[] il, string location)
+        /// <summary>Every catch and filter handler of every method body, with the method's location and IL.</summary>
+        private IEnumerable<Handler> Handlers()
         {
-            bool isHandler = region.Kind is ExceptionRegionKind.Catch or ExceptionRegionKind.Filter;
-            if (!isHandler)
+            foreach (MethodDefinitionHandle methodHandle in AllMethods())
             {
-                yield break;
-            }
+                MethodDefinition method = _reader.GetMethodDefinition(methodHandle);
+                if (method.RelativeVirtualAddress == 0)
+                {
+                    continue;
+                }
 
-            string at = At(location, region.HandlerOffset);
+                MethodBodyBlock body = _peReader.GetMethodBody(method.RelativeVirtualAddress);
+                byte[] il = body.GetILBytes() ?? Array.Empty<byte>();
+                string location = Describe(methodHandle);
+                foreach (ExceptionRegion region in body.ExceptionRegions.Where(IsCatchOrFilter))
+                {
+                    yield return new Handler(location, region, il);
+                }
+            }
+        }
+
+        private static bool IsCatchOrFilter(ExceptionRegion region) => region.Kind is ExceptionRegionKind.Catch or ExceptionRegionKind.Filter;
+
+        private IEnumerable<Violation> CatchViolations(Handler handler)
+        {
+            ExceptionRegion region = handler.Region;
+            string at = At(handler.Location, region.HandlerOffset);
             if (region.Kind == ExceptionRegionKind.Catch && IsCatchAllType(TypeName(region.CatchType)))
             {
                 yield return new Violation(at, "generic catch (" + TypeName(region.CatchType) + ")");
@@ -191,7 +193,7 @@ namespace CoveredLot.Shared
 
             if (region.Kind == ExceptionRegionKind.Filter)
             {
-                IReadOnlyList<string> filteredTypes = DecodeInstructions(il, region.FilterOffset, region.HandlerOffset, location)
+                IReadOnlyList<string> filteredTypes = DecodeInstructions(handler.Il, region.FilterOffset, region.HandlerOffset, handler.Location)
                     .Where(instruction => instruction.OpCode == OpCodes.Isinst && !instruction.Operand.IsNil)
                     .Select(instruction => TypeName(instruction.Operand))
                     .ToList();
@@ -201,7 +203,7 @@ namespace CoveredLot.Shared
                 }
             }
 
-            bool isEmpty = DecodeInstructions(il, region.HandlerOffset, region.HandlerOffset + region.HandlerLength, location)
+            bool isEmpty = DecodeInstructions(handler.Il, region.HandlerOffset, region.HandlerOffset + region.HandlerLength, handler.Location)
                 .All(instruction => EmptyHandlerOpCodes.Contains(instruction.OpCode.Value));
             if (isEmpty)
             {
@@ -209,27 +211,44 @@ namespace CoveredLot.Shared
             }
         }
 
+        private string DescribeCatch(ExceptionRegion region) => region.Kind == ExceptionRegionKind.Catch
+            ? "catch block (" + TypeName(region.CatchType) + ")"
+            : "catch block with a when-filter";
+
         private static bool IsCatchAllType(string typeName) => typeName is "System.Exception" or "System.Object";
+
+        private static bool IsReassignableStatic(FieldDefinition field) =>
+            (field.Attributes & FieldAttributes.Static) != 0
+            && (field.Attributes & (FieldAttributes.Literal | FieldAttributes.InitOnly)) == 0;
 
         private bool ImplementsAsyncStateMachine(TypeDefinitionHandle handle) => _reader.GetTypeDefinition(handle)
             .GetInterfaceImplementations()
             .Select(implementation => TypeName(_reader.GetInterfaceImplementation(implementation).Interface))
             .Contains(AsyncStateMachineInterface, StringComparer.Ordinal);
 
-        /// <summary>Whether the type is, or is nested in, the compiler-written &lt;PrivateImplementationDetails&gt;.</summary>
-        private bool IsInPrivateImplementationDetails(TypeDefinitionHandle handle)
+        /// <summary>
+        /// Whether the compiler wrote the type or a type it is nested in: a name C# cannot declare (one with '&lt;')
+        /// that carries [CompilerGenerated]. Lambda caches, closures, iterators and &lt;PrivateImplementationDetails&gt;
+        /// are such types; an attribute alone does not make a hand-written type one.
+        /// </summary>
+        private bool IsCompilerWritten(TypeDefinitionHandle handle)
         {
-            TypeDefinition outermost = _reader.GetTypeDefinition(handle);
-            while (!outermost.GetDeclaringType().IsNil)
+            for (TypeDefinitionHandle current = handle; !current.IsNil; current = _reader.GetTypeDefinition(current).GetDeclaringType())
             {
-                outermost = _reader.GetTypeDefinition(outermost.GetDeclaringType());
+                TypeDefinition type = _reader.GetTypeDefinition(current);
+                bool hasUnspeakableName = _reader.GetString(type.Name).Contains('<', StringComparison.Ordinal);
+                if (hasUnspeakableName && HasCompilerGeneratedAttribute(type))
+                {
+                    return true;
+                }
             }
 
-            return _reader.GetString(outermost.Name) == PrivateImplementationDetails
-                && outermost.GetCustomAttributes()
-                    .Select(attribute => AttributeTypeName(_reader.GetCustomAttribute(attribute)))
-                    .Contains(CompilerGeneratedAttribute, StringComparer.Ordinal);
+            return false;
         }
+
+        private bool HasCompilerGeneratedAttribute(TypeDefinition type) => type.GetCustomAttributes()
+            .Select(attribute => AttributeTypeName(_reader.GetCustomAttribute(attribute)))
+            .Contains(CompilerGeneratedAttribute, StringComparer.Ordinal);
 
         private string AttributeTypeName(CustomAttribute attribute) => attribute.Constructor.Kind switch
         {
@@ -368,6 +387,9 @@ namespace CoveredLot.Shared
         }
 
         private readonly record struct Instruction(int Offset, OpCode OpCode, EntityHandle Operand);
+
+        /// <summary>A catch or filter handler, with the location of its method and the method's IL.</summary>
+        private readonly record struct Handler(string Location, ExceptionRegion Region, byte[] Il);
 
         private sealed record MemberName(string DeclaringType, string Name);
 

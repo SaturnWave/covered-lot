@@ -5,6 +5,7 @@
 # file itself holds none of them and stays clean when HEAD is scanned.
 #
 # Usage: tools/scan-self-test.sh       Exit code 0 when every expectation holds.
+export LC_ALL=C LANG=C
 set -euo pipefail
 
 repo_root="$(git rev-parse --show-toplevel)"

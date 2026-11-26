@@ -21,17 +21,12 @@ namespace CoveredLot.Core.Tests
     /// </summary>
     public sealed class ShippedLevelTextTests
     {
-        private const string LevelsFolder = "Assets/Generated/Resources/Levels";
-        private const string ExampleName = "six-by-six";
         private const int ColourCount = 6;
 
-        /// <summary>Strict UTF-8 that keeps a byte-order mark as U+FEFF, so LotText.Read sees every byte of the file.</summary>
-        private static readonly Encoding StrictUtf8 = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
-
         /// <summary>The level id of every listed level, then the Example's name.</summary>
-        public static TheoryData<string> ShippedTexts => new(ListedLevels().Select(level => level.Level.Value).Append(ExampleName));
+        public static TheoryData<string> ShippedTexts => new(ShippedLevels.Listed().Select(level => level.Level.Value).Append(ShippedLevels.ExampleName));
 
-        public static TheoryData<string> ListedLevelIds => new(ListedLevels().Select(level => level.Level.Value));
+        public static TheoryData<string> ListedLevelIds => new(ShippedLevels.Listed().Select(level => level.Level.Value));
 
         [Theory]
         [MemberData(nameof(ShippedTexts))]
@@ -46,14 +41,14 @@ namespace CoveredLot.Core.Tests
         {
             LotLevel level = LoadedLevel(name);
 
-            Assert.Equal(File.ReadAllBytes(TextPath(name)), Encoding.UTF8.GetBytes(LotText.Write(level)));
+            Assert.Equal(File.ReadAllBytes(ShippedLevels.TextPath(name)), Encoding.UTF8.GetBytes(LotText.Write(level)));
         }
 
         [Theory]
         [MemberData(nameof(ListedLevelIds))]
         public void A_listed_level_has_the_fingerprint_its_presentation_entry_gives(string levelId)
         {
-            PresentationLevel entry = Assert.Single(ListedLevels(), level => level.Level.Value == levelId);
+            PresentationLevel entry = Assert.Single(ShippedLevels.Listed(), level => level.Level.Value == levelId);
 
             Assert.Equal(entry.Fingerprint.Hex, LotText.Fingerprint(LoadedLevel(levelId)));
         }
@@ -73,7 +68,7 @@ namespace CoveredLot.Core.Tests
         [MemberData(nameof(ShippedTexts))]
         public void A_shipped_text_is_printable_ascii_with_lf_line_ends_and_no_byte_order_mark_or_trailing_newline(string name)
         {
-            IReadOnlyList<string> problems = FormatProblems(File.ReadAllBytes(TextPath(name)));
+            IReadOnlyList<string> problems = FormatProblems(File.ReadAllBytes(ShippedLevels.TextPath(name)));
 
             Assert.True(problems.Count == 0, name + ".txt " + string.Join("; ", problems));
         }
@@ -122,7 +117,7 @@ namespace CoveredLot.Core.Tests
 
         private static LotLevel LoadedLevel(string name)
         {
-            LotDefinition definition = LotText.Read(StrictUtf8.GetString(File.ReadAllBytes(TextPath(name)))) switch
+            LotDefinition definition = LotText.Read(ShippedLevels.StrictUtf8.GetString(File.ReadAllBytes(ShippedLevels.TextPath(name)))) switch
             {
                 LotTextResult.Read read => read.Definition,
                 var malformed => throw new XunitException(name + " is not a pc-lot text: " + malformed),
@@ -133,14 +128,5 @@ namespace CoveredLot.Core.Tests
                 var rejected => throw new XunitException(name + " is refused by LotLoader: " + rejected),
             };
         }
-
-        private static IReadOnlyList<PresentationLevel> ListedLevels() =>
-            PresentationJson.Read(StrictUtf8.GetString(File.ReadAllBytes(RepositoryLayout.FullPath(LevelsFolder + "/presentation.json")))) switch
-            {
-                PresentationReadResult.Read read => read.File.Levels,
-                var unreadable => throw new XunitException("presentation.json does not read: " + unreadable),
-            };
-
-        private static string TextPath(string name) => RepositoryLayout.FullPath(LevelsFolder + "/" + name + ".txt");
     }
 }

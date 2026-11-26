@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 # Checks the repository's ignore and attribute rules against a fixed table, so a change to
 # .gitignore or .gitattributes cannot silently start tracking build output or secrets, or
-# stop tracking source. Exit code 0 when every expectation holds.
+# stop tracking source. It also pins what the scripts and .editorconfig promise: every
+# tools/*.sh is executable and fixes its locale first, and the level texts keep no final
+# newline. It checks the repository it belongs to, from whatever folder it is started.
+# Exit code 0 when every expectation holds.
+export LC_ALL=C LANG=C
 set -euo pipefail
 
-repo_root="$(git rev-parse --show-toplevel)"
-cd "$repo_root"
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 failures=0
 fail() {
@@ -87,8 +90,34 @@ while IFS= read -r line; do
   fi
 done < <(git ls-files --eol)
 
+# Every tracked script is stored executable, so it runs on macOS and in CI as it does here.
+while IFS= read -r entry; do
+  mode="${entry%% *}"
+  if [ "$mode" != 100755 ]; then
+    fail "${entry##*$'\t'} is stored with mode $mode, expected 100755 (git update-index --chmod=+x)"
+  fi
+done < <(git ls-files -s -- 'tools/*.sh')
+
+# Every script fixes its locale before anything else, so sorting and character classes do not
+# depend on the shell that starts it.
+for script in tools/*.sh; do
+  first_command="$(awk 'NR > 1 && NF > 0 && !/^#/ { print; exit }' "$script")"
+  if [ "$first_command" != "export LC_ALL=C LANG=C" ]; then
+    fail "$script does not start with export LC_ALL=C LANG=C"
+  fi
+done
+
+# The level texts must stay byte-identical to the engine's output, which has no final newline,
+# so .editorconfig must not ask editors to add one or to trim lines under Assets/Generated.
+generated_section="$(awk '/^\[/ { in_section = ($0 == "[Assets/Generated/**]"); next } in_section' .editorconfig)"
+for setting in "insert_final_newline = false" "trim_trailing_whitespace = false"; do
+  if ! grep -q -x -F -e "$setting" <<< "$generated_section"; then
+    fail ".editorconfig does not set $setting for [Assets/Generated/**]"
+  fi
+done
+
 if [ "$failures" -gt 0 ]; then
   echo "check-repo: $failures failure(s)" >&2
   exit 1
 fi
-echo "check-repo: every ignore and attribute expectation holds"
+echo "check-repo: every ignore, attribute, script and .editorconfig expectation holds"

@@ -4,20 +4,32 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using CoveredLot.Core.Tests.Support;
+using CoveredLot.Shared;
 using Xunit;
 
 namespace CoveredLot.Core.Tests
 {
     /// <summary>
-    /// The Unity side of the compile rules (design sections 3 and 10a). Core's assembly definition keeps it
-    /// Unity-free and lets it see only the two engine DLLs; no assembly allows unsafe code; and every CoveredLot
-    /// assembly carries its own csc.rsp, because a csc.rsp at the Assets root would apply to every package as well.
+    /// The Unity side of the compile rules (design sections 3, 8.1 and 10a). Core's assembly definition keeps it
+    /// Unity-free and lets it see only the two engine DLLs, and the .NET build of Core references no more; no assembly
+    /// allows unsafe code; and every CoveredLot assembly carries its own csc.rsp, because a csc.rsp at the Assets root
+    /// would apply to every package as well. Unity and the .NET build compile the same files into Core: the .NET build
+    /// takes every .cs under Assets/CoveredLot/Core, so no other asmdef or asmref may move files in or out of Core in
+    /// Unity, and no source may sit where Unity does not import it.
     /// </summary>
     public sealed class AsmdefGuardTests
     {
-        private const string CoreAsmdef = "Assets/CoveredLot/Core/CoveredLot.Core.asmdef";
+        private const string CoreFolder = "Assets/CoveredLot/Core";
+        private const string CoreAsmdef = CoreFolder + "/CoveredLot.Core.asmdef";
         private const string CoreAssembly = "CoveredLot.Core";
+
+        /// <summary>The assembly every netstandard2.1 library references; Unity gives it to every assembly as well.</summary>
+        private const string NetStandard = "netstandard";
+
+        /// <summary>The guid line of a Unity .meta file.</summary>
+        private static readonly Regex MetaGuid = new(@"^guid: (?<guid>[0-9a-f]{32})\r?$", RegexOptions.CultureInvariant | RegexOptions.Multiline);
 
         /// <summary>Core's asmdef, property by property, each value in compact JSON.</summary>
         private static readonly IReadOnlyDictionary<string, string> ExpectedCoreAsmdef = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -51,16 +63,36 @@ namespace CoveredLot.Core.Tests
             Assert.Equal(Sorted(ExpectedCoreAsmdef), Sorted(actual));
         }
 
+        /// <summary>
+        /// Unity gives Core only what its asmdef names (overrideReferences, noEngineReferences), so the .NET build may
+        /// use no more, or a test could pass on code Unity cannot compile. The compiler drops a reference that nothing
+        /// uses, so this is a subset, not an equality.
+        /// </summary>
+        [Fact]
+        public void The_dotnet_build_of_Core_references_only_netstandard_and_the_dlls_its_asmdef_names()
+        {
+            ISet<string> allowed = PrecompiledReferences()
+                .Select(dll => Path.GetFileNameWithoutExtension(dll))
+                .Append(NetStandard)
+                .ToHashSet(StringComparer.Ordinal);
+            using var core = new AssemblyScanner(typeof(UnknownEngineCaseException).Assembly.Location);
+
+            IReadOnlyList<string> unexpected = core.ReferencedAssemblyNames().Where(name => !allowed.Contains(name)).ToList();
+
+            Assert.True(unexpected.Count == 0,
+                CoreAssembly + " references " + string.Join(", ", unexpected) + ", which its asmdef does not give it in Unity.");
+        }
+
         [Fact]
         public void No_asmdef_under_Assets_allows_unsafe_code()
         {
-            IReadOnlyList<string> asmdefs = Asmdefs("Assets");
+            IReadOnlyList<string> asmdefs = FilesWithExtension("Assets", ".asmdef");
             var unsafeOnes = new List<string>();
             foreach (string asmdef in asmdefs)
             {
                 if (CompactProperties(asmdef).TryGetValue("allowUnsafeCode", out string? value) && value != "false")
                 {
-                    unsafeOnes.Add(RepositoryLayout.Relative(RepositoryLayout.Root, asmdef));
+                    unsafeOnes.Add(RepositoryLayout.Relative(asmdef));
                 }
             }
 
@@ -68,10 +100,46 @@ namespace CoveredLot.Core.Tests
             Assert.True(unsafeOnes.Count == 0, "these asmdefs allow unsafe code: " + string.Join(", ", unsafeOnes));
         }
 
+        /// <summary>Unity compiles a folder that holds its own asmdef or asmref into another assembly.</summary>
+        [Fact]
+        public void The_Core_folder_holds_the_Core_asmdef_and_no_other_asmdef_or_asmref()
+        {
+            IEnumerable<string> definitions = FilesWithExtension(CoreFolder, ".asmdef")
+                .Concat(FilesWithExtension(CoreFolder, ".asmref"))
+                .Select(path => RepositoryLayout.Relative(path));
+
+            Assert.Equal(new[] { CoreAsmdef }, definitions);
+        }
+
+        /// <summary>An asmref adds its folder's files to the assembly it names, in Unity only.</summary>
+        [Fact]
+        public void No_asmref_under_Assets_adds_files_to_Core()
+        {
+            ISet<string> namesOfCore = WaysToNameCore();
+
+            IReadOnlyList<string> offenders = FilesWithExtension("Assets", ".asmref")
+                .Where(asmref => namesOfCore.Contains(ReferenceOf(asmref)))
+                .Select(path => RepositoryLayout.Relative(path))
+                .ToList();
+
+            Assert.True(offenders.Count == 0, "these asmrefs add their files to " + CoreAssembly + " in Unity only: " + string.Join(", ", offenders));
+        }
+
+        [Fact]
+        public void No_Core_source_lies_where_Unity_does_not_import_it()
+        {
+            IReadOnlyList<string> sources = FilesWithExtension(CoreFolder, ".cs").Select(path => RepositoryLayout.Relative(path)).ToList();
+
+            IReadOnlyList<string> hidden = sources.Where(UnityAssets.IsHidden).ToList();
+
+            Assert.NotEmpty(sources);
+            Assert.True(hidden.Count == 0, "Unity does not import these, but the .NET build compiles them into Core: " + string.Join(", ", hidden));
+        }
+
         [Fact]
         public void Every_CoveredLot_asmdef_folder_has_a_csc_rsp_with_exactly_the_approved_options()
         {
-            IReadOnlyList<string> asmdefs = Asmdefs("Assets/CoveredLot");
+            IReadOnlyList<string> asmdefs = FilesWithExtension("Assets/CoveredLot", ".asmdef");
             var problems = new List<string>();
             foreach (string asmdef in asmdefs)
             {
@@ -105,10 +173,40 @@ namespace CoveredLot.Core.Tests
         private static IEnumerable<string> ApprovedOptions(string assembly) =>
             assembly == CoreAssembly ? OptionsOfEveryAssembly.Append(CoreOnlyOption) : OptionsOfEveryAssembly;
 
-        private static IReadOnlyList<string> Asmdefs(string relativeFolder) => Directory
-            .EnumerateFiles(RepositoryLayout.FullPath(relativeFolder), "*.asmdef", SearchOption.AllDirectories)
-            .Where(path => string.Equals(Path.GetExtension(path), ".asmdef", StringComparison.Ordinal))
+        /// <summary>Every file under the folder whose extension is exactly the given one, compared ordinally.</summary>
+        private static IReadOnlyList<string> FilesWithExtension(string relativeFolder, string extension) => Directory
+            .EnumerateFiles(RepositoryLayout.FullPath(relativeFolder), "*" + extension, SearchOption.AllDirectories)
+            .Where(path => string.Equals(Path.GetExtension(path), extension, StringComparison.Ordinal))
             .ToList();
+
+        private static IReadOnlyList<string> PrecompiledReferences()
+        {
+            using JsonDocument document = JsonDocument.Parse(File.ReadAllText(RepositoryLayout.FullPath(CoreAsmdef), Encoding.UTF8));
+            return document.RootElement.GetProperty("precompiledReferences").EnumerateArray()
+                .Select(reference => reference.GetString())
+                .OfType<string>()
+                .ToList();
+        }
+
+        /// <summary>The assembly an asmref names: an assembly name, or "GUID:" and the guid of the asmdef's .meta file.</summary>
+        private static string ReferenceOf(string asmref)
+        {
+            using JsonDocument document = JsonDocument.Parse(File.ReadAllText(asmref, Encoding.UTF8));
+            return document.RootElement.TryGetProperty("reference", out JsonElement reference) ? reference.GetString() ?? string.Empty : string.Empty;
+        }
+
+        /// <summary>Core's assembly name and, once Unity has written the asmdef's .meta file, its GUID reference.</summary>
+        private static ISet<string> WaysToNameCore()
+        {
+            var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { CoreAssembly };
+            string meta = RepositoryLayout.FullPath(CoreAsmdef + ".meta");
+            if (File.Exists(meta) && MetaGuid.Match(File.ReadAllText(meta, Encoding.UTF8)) is { Success: true } guidLine)
+            {
+                names.Add("GUID:" + guidLine.Groups["guid"].Value);
+            }
+
+            return names;
+        }
 
         private static string AssemblyName(string asmdef)
         {

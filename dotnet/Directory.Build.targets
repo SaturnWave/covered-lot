@@ -5,6 +5,11 @@
     property set in any props/targets/rsp file, on the command line or in a project file is seen
     the way the compiler sees it. The engine's layering table is left out: this repository has
     one source project, the Unity-free CoveredLot.Core.
+
+    Beyond the engine's rules it also pins every switch that turns the analyzers or the nullable
+    analysis off without a warning, because the culture rules (CA1304-CA1311) and CA1031 are only
+    errors while the analyzers run with the root .editorconfig. BuildGuardTests proves that each
+    rule fires, and that no nearer MSBuild or analyzer config file can take this one's place.
   -->
   <PropertyGroup>
     <PuzzleIsUnityBound>false</PuzzleIsUnityBound>
@@ -21,6 +26,19 @@
       <_PuzzleProblems Condition="'$(AllowUnsafeBlocks)' == 'true'">$(_PuzzleProblems) AllowUnsafeBlocks must not be true;</_PuzzleProblems>
       <_PuzzleProblems Condition="'$(NoWarn)' != '1701;1702' and '$(NoWarn)' != ''">$(_PuzzleProblems) NoWarn must stay at the SDK default '1701;1702' (is '$(NoWarn)');</_PuzzleProblems>
       <_PuzzleProblems Condition="'$(WarningsNotAsErrors)' != ''">$(_PuzzleProblems) WarningsNotAsErrors must be empty (is '$(WarningsNotAsErrors)');</_PuzzleProblems>
+
+      <!-- The analyzers and the nullable analysis must run, with the root .editorconfig. -->
+      <_PuzzleProblems Condition="'$(AnalysisLevel)' != '10.0-recommended'">$(_PuzzleProblems) AnalysisLevel must be 10.0-recommended (is '$(AnalysisLevel)');</_PuzzleProblems>
+      <_PuzzleProblems Condition="'$(EnableNETAnalyzers)' != 'true'">$(_PuzzleProblems) EnableNETAnalyzers must be true;</_PuzzleProblems>
+      <_PuzzleProblems Condition="'$(RunAnalyzers)' == 'false'">$(_PuzzleProblems) RunAnalyzers must not be false;</_PuzzleProblems>
+      <_PuzzleProblems Condition="'$(RunAnalyzersDuringBuild)' == 'false'">$(_PuzzleProblems) RunAnalyzersDuringBuild must not be false;</_PuzzleProblems>
+      <_PuzzleProblems Condition="'$(EnforceCodeStyleInBuild)' != 'true'">$(_PuzzleProblems) EnforceCodeStyleInBuild must be true;</_PuzzleProblems>
+      <_PuzzleProblems Condition="'$(DiscoverEditorConfigFiles)' == 'false'">$(_PuzzleProblems) DiscoverEditorConfigFiles must not be false (the root .editorconfig makes the culture and catch rules errors);</_PuzzleProblems>
+      <_PuzzleProblems Condition="'$(CodeAnalysisRuleSet)' != ''">$(_PuzzleProblems) CodeAnalysisRuleSet must be empty (is '$(CodeAnalysisRuleSet)');</_PuzzleProblems>
+      <!-- Empty means the compiler's default, 4. Level 0 drops every warning, and with it the
+           analyzer rules that .editorconfig raises to errors. -->
+      <_PuzzleProblems Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('$(WarningLevel)', '^[0-3]$'))">$(_PuzzleProblems) WarningLevel must not be below 4 (is '$(WarningLevel)');</_PuzzleProblems>
+      <_PuzzleProblems Condition="$([System.String]::Copy('$(Features)').Contains('run-nullable-analysis'))">$(_PuzzleProblems) Features must not change nullable analysis (is '$(Features)');</_PuzzleProblems>
 
       <!-- The Unity-free Core, which Unity compiles from the same files. -->
       <_PuzzleProblems Condition="'$(PuzzleIsUnityBound)' == 'true' and '$(TargetFramework)' != 'netstandard2.1'">$(_PuzzleProblems) TargetFramework must be netstandard2.1 (is '$(TargetFramework)');</_PuzzleProblems>

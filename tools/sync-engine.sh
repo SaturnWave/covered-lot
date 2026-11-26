@@ -16,6 +16,7 @@
 # It works on a `git archive` of the commit, so the engine checkout (which another session
 # shares) is never touched. Close the Unity editor first: Unity must not import half a sync.
 # Exit codes: 0 done (or, with --check, identical), 1 refused or different, 2 usage error.
+export LC_ALL=C LANG=C
 set -euo pipefail
 
 readonly ENGINE_REPOSITORY=https://github.com/SaturnWave/puzzle-engine

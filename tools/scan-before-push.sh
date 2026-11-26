@@ -16,6 +16,7 @@
 # Some pattern strings below are split in two ("one""drive"), so that this file does not
 # match its own patterns when HEAD is scanned. tools/scan-self-test.sh plants one of each
 # kind of hit in a throwaway repository and checks that this script reports it.
+export LC_ALL=C LANG=C
 set -euo pipefail
 
 if [ "$#" -gt 1 ]; then

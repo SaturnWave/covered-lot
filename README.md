@@ -35,7 +35,9 @@ files are exactly what that commit builds, run `tools/sync-engine.sh <engine-dir
 
 Run these from the repository root in Git Bash:
 
-- `tools/check-repo.sh` checks the ignore and line-ending rules against a fixed table.
+- `tools/check-repo.sh` checks the ignore and line-ending rules against a fixed table, and
+  that every script is executable and fixes its locale, and that `.editorconfig` leaves the
+  level texts' bytes alone.
 - `tools/scan-before-push.sh` runs before every push. The repository is public, so it
   refuses to pass any secret, personal path, user name or non-noreply email in the commits
   a push would publish. `tools/scan-self-test.sh` proves it catches each kind.
@@ -46,9 +48,20 @@ Run these from the repository root in Git Bash:
 editor. It builds `dotnet/CoveredLot.Core`, the .NET build of the files Unity compiles from
 `Assets/CoveredLot/Core`, against the engine DLLs in `Assets/Generated`, and runs
 `dotnet/CoveredLot.Core.Tests` in Release twice: under tr-TR, then under sv-SE. The tests
-check the culture guard; the compiled Core (no generic, bare, filtered or empty catch, no
-`System.Random` or `UnityEngine.Random`, no async, no unchecked arithmetic); the asmdef and
-`csc.rsp` rules; `Assets/Generated` against its checksums and record; and every shipped
-level text. The script fails if either run fails or runs no test, and writes TRX results to
-`artifacts/local/dotnet/<culture>/`. To run the tests by hand, set `PUZZLE_TEST_CULTURE` to
-`tr-TR` or `sv-SE` first; without it they fail.
+check:
+
+- the culture guard;
+- the build guard (`dotnet/Directory.Build.targets`) with its analyzer settings, and that no
+  other MSBuild or analyzer config file can override it;
+- the compiled Core: no catch block at all, no `System.Random` or `UnityEngine.Random`, no
+  async, no static field that can be reassigned, and no reference beyond what its asmdef
+  gives it in Unity;
+- that no Core source opens an `unchecked` context, so the integer arithmetic it writes
+  stays overflow-checked;
+- the asmdef and `csc.rsp` rules, and that Unity and .NET compile the same files into Core;
+- `Assets/Generated` against its checksums and record, and every shipped level text.
+
+The script fails if either run fails, runs no test or skips one, and writes TRX results to
+`artifacts/local/dotnet/<culture>/`. To run the tests by hand, run
+`dotnet test CoveredLot.Core.Tests -c Release` from `dotnet/`, so that its `global.json`
+picks the SDK, with `PUZZLE_TEST_CULTURE` set to `tr-TR` or `sv-SE`; without it they fail.

@@ -81,13 +81,17 @@ namespace CoveredLot.Shared.Samples
         }
     }
 
-    /// <summary>Arithmetic in an unchecked context: it compiles to add, sub and mul, which wrap silently on overflow.</summary>
-    internal static class UncheckedArithmeticSample
+    /// <summary>Mutable static state, which Core may not keep: a static field and a static auto-property with a setter.</summary>
+    internal static class MutableStaticSample
     {
-        public static int AddsWithoutCheck(int first, int second) => unchecked(first + second);
+        private static int _count;
 
-        public static int SubtractsWithoutCheck(int first, int second) => unchecked(first - second);
+        public static int Total { get; set; }
 
-        public static int MultipliesWithoutCheck(int first, int second) => unchecked(first * second);
+        public static int Next()
+        {
+            _count = _count + 1;
+            return _count;
+        }
     }
 }
