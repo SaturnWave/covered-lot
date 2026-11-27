@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using CoveredLot.Core.Catalogue;
+using CoveredLot.Core.Development;
+using CoveredLot.Core.Layout;
 using CoveredLot.Core.Pictures;
 using CoveredLot.Core.Session;
 using PuzzleCore;
@@ -15,8 +17,8 @@ namespace CoveredLot.Core
     /// the text rules (<see cref="TextRules"/>): it is printable ASCII and holds none of the banned words, development lines
     /// included. It writes numbers with the invariant culture only, so a line reads the same on every device. It holds the
     /// game's title, the entries' titles, the buttons and the headings, the HUD's lines, the status lines, the end card's
-    /// lines, the board's and the tags list's words and glyphs, and the problem screen's lines; the development line comes
-    /// with a later piece. The pictures hold every string they show, so the members that only the pictures use are
+    /// lines, the board's and the tags list's words and glyphs, the problem screen's lines, and the development line and
+    /// its culture button. The pictures hold every string they show, so the members that only the pictures use are
     /// internal, and the public ones are what the screens show by themselves.
     /// </summary>
     public static class Copy
@@ -74,6 +76,9 @@ namespace CoveredLot.Core
 
         /// <summary>What stands between the parts of a status line, as in "Cover lifted: red. Three red cleared."</summary>
         private const string StatusSeparator = " ";
+
+        /// <summary>What stands between the parts of the development line, as in "slot 0024 | par 4".</summary>
+        private const string DevLineSeparator = " | ";
 
         /// <summary>What the level list and the top bar call an entry: "Example", or "Level 12" for the twelfth listed level.</summary>
         public static string TitleOf(EntryTitle title) => title switch
@@ -145,6 +150,40 @@ namespace CoveredLot.Core
             CatalogueProblem.ExamplePeakParNotFound => ExampleLabel + ": no par found",
             _ => throw new ArgumentOutOfRangeException(nameof(problem), "Copy has no line for this kind of catalogue problem."),
         };
+
+        /// <summary>
+        /// The development line (design section 9), which only development builds show, its parts joined by " | ": in a
+        /// level, "slot 0024 | par 4 | tr-TR | 1080x2400 | safe 0 63 1080 2247 | cell 47". It names the level by its slot in
+        /// four digits or more, or as "example", then its par, the culture, the screen's width and height in pixels, the
+        /// safe area as Screen.safeArea gives it (its left, its bottom, its width and its height, in pixels) and the side
+        /// of the board's cells in panel units. Off a level it starts at the culture, and before the board's first layout it
+        /// has no cell. An empty culture name, the invariant culture's, reads "invariant".
+        /// </summary>
+        public static string DevLine(DevFacts facts)
+        {
+            var parts = new List<string>();
+            if (facts.Entry.TryGet(out CatalogueEntry? entry))
+            {
+                parts.Add(entry.Slot.TryGet(out LevelIndex slot) ? SlotLabel(slot) : ExampleLabel);
+                parts.Add("par " + Number(entry.PeakPar.Bays.Value));
+            }
+
+            PixelRect safeArea = facts.SafeArea;
+            parts.Add(facts.CultureName.Length == 0 ? "invariant" : facts.CultureName);
+            parts.Add(Number(facts.Screen.Width.Value) + "x" + Number(facts.Screen.Height.Value));
+            parts.Add("safe " + Number(safeArea.X.Value) + " " + Number(safeArea.Y.Value) + " "
+                + Number(safeArea.Size.Width.Value) + " " + Number(safeArea.Size.Height.Value));
+            if (facts.Board.TryGet(out BoardGeometry? board))
+            {
+                parts.Add("cell " + Number(board.CellSide));
+            }
+
+            return string.Join(DevLineSeparator, parts);
+        }
+
+        /// <summary>The level list's culture button in development builds, naming the culture set now: "Culture: device", "Culture: tr-TR", "Culture: sv-SE".</summary>
+        public static string CultureButton(DevCulture culture) =>
+            "Culture: " + (DevCultures.NameOf(culture).TryGet(out string? name) ? name : "device");
 
         /// <summary>What a development line says for each way the engine finds a pc-lot text malformed; never the enum's own name.</summary>
         public static string Of(LotTextProblem problem) => problem switch
@@ -250,9 +289,12 @@ namespace CoveredLot.Core
         private static string LabelOf(LevelSource source) => source switch
         {
             LevelSource.Example => ExampleLabel,
-            LevelSource.Listed listed => "slot " + listed.Slot.Value.ToString("D4", CultureInfo.InvariantCulture),
+            LevelSource.Listed listed => SlotLabel(listed.Slot),
             _ => throw new ArgumentOutOfRangeException(nameof(source), "Copy has no label for this kind of level source."),
         };
+
+        /// <summary>A listed level's name in the development lines: its slot in four digits or more, "slot 0003".</summary>
+        private static string SlotLabel(LevelIndex slot) => "slot " + slot.Value.ToString("D4", CultureInfo.InvariantCulture);
 
         /// <summary>" (piece 4)" for the piece a loader problem concerns, or nothing when it concerns none.</summary>
         private static string PieceNote(Option<PieceId> piece) =>

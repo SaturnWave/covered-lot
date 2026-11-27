@@ -4,6 +4,8 @@ using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using CoveredLot.Core.Catalogue;
+using CoveredLot.Core.Development;
+using CoveredLot.Core.Navigation;
 using CoveredLot.Core.Pictures;
 using CoveredLot.Core.Session;
 using PuzzleCore.Jam;
@@ -19,8 +21,8 @@ namespace CoveredLot.Core.Tests
     /// adds at a later sync fails here, by name, instead of reaching a discard arm on a phone: the engine's results and
     /// events that the catalogue, the session and the pictures switch over, the values their cases carry (FailKind,
     /// InvalidReason), the sets that the pictures and the copy switch over (Facing, AheadRelation, LotClue), and Core's own.
-    /// The enums are pinned with their values, the engine's of which grow only at the end, and Core's own TileMark and
-    /// Swatch too; the engine's result hierarchies by every type of its assembly that derives from them, a generic one
+    /// The enums are pinned with their values, the engine's of which grow only at the end, and Core's own TileMark, Swatch
+    /// and DevCulture too; the engine's result hierarchies by every type of its assembly that derives from them, a generic one
     /// through its generic definition; Core's own hierarchies also by their private constructors, which keep any other
     /// assembly from adding a case, and by the cases' constructors, none of them public, since only Core makes them.
     /// </summary>
@@ -188,9 +190,21 @@ namespace CoveredLot.Core.Tests
         }
 
         [Fact]
+        public void AppScreen_is_closed_with_exactly_the_cases_Problems_LevelList_and_Playing()
+        {
+            AssertCoreCases(typeof(AppScreen), "LevelList", "Playing", "Problems");
+        }
+
+        [Fact]
         public void TileMark_has_exactly_the_values_Plain_and_Blocker_in_this_order()
         {
             AssertValues<TileMark>("Plain", "Blocker");
+        }
+
+        [Fact]
+        public void DevCulture_has_exactly_the_values_Device_Turkish_and_Swedish_in_this_order()
+        {
+            AssertValues<DevCulture>("Device", "Turkish", "Swedish");
         }
 
         /// <summary>The swatches follow the colour ids 1 to 6, so each value is its colour id less one.</summary>
