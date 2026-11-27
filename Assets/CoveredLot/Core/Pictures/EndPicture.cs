@@ -6,8 +6,8 @@ namespace CoveredLot.Core.Pictures
 {
     /// <summary>
     /// What the end card shows of a session (design section 9): no card while the level is in play; the win card, with the
-    /// stars the win earns and its peak against the par; or the fail card, with the sentence for the kind of fail. Closed;
-    /// only the pictures make them.
+    /// stars the win earns and its peak against the par; or the fail card, with the sentence for the kind of fail, and for
+    /// full bays the rule that frees bays. Closed; only the pictures make them.
     /// </summary>
     public abstract class EndPicture
     {
@@ -43,13 +43,23 @@ namespace CoveredLot.Core.Pictures
             public string PeakLine { get; }
         }
 
-        /// <summary>The level is failed with every bay full, the one fail a loaded level reaches: the fail card.</summary>
+        /// <summary>
+        /// The level is failed with every bay full, the one fail a loaded level reaches: the fail card, with the rule that
+        /// frees bays under its sentence. The card covers the lot only, so the full bays stay in view under it.
+        /// </summary>
         public sealed class BaysFull : EndPicture
         {
-            internal BaysFull() => Text = Copy.AllBaysFull;
+            internal BaysFull()
+            {
+                Text = Copy.AllBaysFull;
+                Hint = Copy.ThreeOfOneColourLeave;
+            }
 
             /// <summary>"All bays are full."</summary>
             public string Text { get; }
+
+            /// <summary>"Three of one colour leave the bays together."</summary>
+            public string Hint { get; }
         }
 
         /// <summary>The level is failed with no vehicle able to leave, which no loaded level reaches (BRIEF:47): the fail card.</summary>

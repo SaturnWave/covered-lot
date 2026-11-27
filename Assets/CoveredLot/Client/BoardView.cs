@@ -22,13 +22,15 @@ namespace CoveredLot.Client
     /// whose vehicle has left is hidden, and the blocker mark stays only on what the last tap bumped into.</description></item>
     /// <item><description>The frame's size is measured on every GeometryChangedEvent, made whole and non-negative, and
     /// BoardGeometry.Fit gives the positions and sizes of the lot, its cells and its vehicles' boxes in it. While Fit gives
-    /// none, as before the frame's first layout, the lot is hidden until the frame's size changes again.</description></item>
+    /// none, as before the frame's first layout, the lot is hidden until the frame's size changes again. After every
+    /// layout the board says so, so that the development line can name the side of its cells.</description></item>
     /// </list>
     /// The cells, the pillars, the ghosts and the links take no pointer events; only the tiles do.
     /// </summary>
     public sealed class BoardView : VisualElement
     {
         private readonly Action<PieceId> _tapped;
+        private readonly Action _laidOut;
 
         /// <summary>Everything the geometry places, which is hidden while there is no geometry.</summary>
         private readonly VisualElement _content = Classed.Element(StyleNames.Layer, PickingMode.Ignore);
@@ -55,9 +57,11 @@ namespace CoveredLot.Client
         private Option<BoardGeometry> _geometry;
 
         /// <param name="tapped">What a click on a vehicle's tile does: tap that vehicle.</param>
-        public BoardView(Action<PieceId> tapped)
+        /// <param name="laidOut">What the board does after each layout, with or without a geometry.</param>
+        public BoardView(Action<PieceId> tapped, Action laidOut)
         {
             _tapped = tapped;
+            _laidOut = laidOut;
             AddToClassList(StyleNames.LotFrame);
             _content.Add(_lot);
             _content.Add(_cellLayer);
@@ -71,6 +75,9 @@ namespace CoveredLot.Client
 
         /// <summary>The Ahead links layer, which draws the arrows of the board's picture.</summary>
         public AheadLinksElement Links => _links;
+
+        /// <summary>Where the lot lies in the frame as it was last laid out; None before the first layout and while the frame cannot hold it.</summary>
+        public Option<BoardGeometry> Geometry => _geometry;
 
         /// <summary>
         /// Shows the session's board as it is now. A session other than the one shown before gets fresh elements; the same
@@ -193,7 +200,8 @@ namespace CoveredLot.Client
 
         /// <summary>
         /// Fits the lot of the picture shown into the frame, places every element where the geometry puts it, and shows
-        /// the lot; hides it when there is no picture yet, no frame size yet, or no geometry for them.
+        /// the lot; hides it when there is no picture yet, no frame size yet, or no geometry for them. Either way it then
+        /// says it has laid the board out.
         /// </summary>
         private void Layout()
         {
@@ -202,11 +210,17 @@ namespace CoveredLot.Client
                 : Option.None<BoardGeometry>();
             _content.style.display = _geometry.HasValue ? DisplayStyle.Flex : DisplayStyle.None;
             _links.Show(_picture is not null ? _picture.AheadLinks : ReadOnlyArray.Empty<AheadLinkPicture>(), _geometry);
-            if (!_geometry.TryGet(out BoardGeometry? geometry))
+            if (_geometry.TryGet(out BoardGeometry? geometry))
             {
-                return;
+                PlaceEverything(geometry);
             }
 
+            _laidOut();
+        }
+
+        /// <summary>Puts the lot, its cells, its pillars, the ghosts and the tiles where the geometry places them.</summary>
+        private void PlaceEverything(BoardGeometry geometry)
+        {
             Place(_lot, geometry.Board);
             PlaceCells(geometry);
             foreach (PillarCell pillar in _pillars)

@@ -14,7 +14,8 @@ namespace CoveredLot.Core.Tests
     /// <summary>
     /// EndPicture, the end card (design section 9). On the Example, as the catalogue loads it from the shipped texts: a
     /// session in play has no card; the winning line 0,3,4,2,8,5,1,6,7 gives Cleared(Three, 3 stars, Most bays used: 3 (par
-    /// 3)); and the taps 0,3,1,8 give BaysFull(All bays are full.). For any outcome, peak and par: a win at the par, or
+    /// 3)); and the taps 0,3,1,8 give BaysFull(All bays are full., Three of one colour leave the bays together.), the
+    /// fail's sentence and the rule that frees bays. For any outcome, peak and par: a win at the par, or
     /// below it, gives three stars, one bay over gives "2 stars" and two over "1 star"; a level failed with no move left,
     /// which no loaded level reaches, gives NoMoveLeft(No move is possible.). The tests run under tr-TR and under sv-SE, and
     /// the lines are the same under both.
@@ -48,14 +49,14 @@ namespace CoveredLot.Core.Tests
         }
 
         [Fact]
-        public void The_taps_0_3_1_8_give_BaysFull_All_bays_are_full()
+        public void The_taps_0_3_1_8_give_BaysFull_All_bays_are_full_with_the_rule_that_frees_bays()
         {
             var session = new GameSession(ShippedCatalogue.Example());
 
             IReadOnlyList<string> notMoved = TapAll(session, 0, 3, 1, 8);
 
             Assert.Empty(notMoved);
-            Assert.Equal("BaysFull(All bays are full.)", End(EndPicture.Of(session)));
+            Assert.Equal("BaysFull(All bays are full., Three of one colour leave the bays together.)", End(EndPicture.Of(session)));
         }
 
         [Theory]

@@ -17,15 +17,16 @@ namespace CoveredLot.Core.Tests
     /// source, with the slot in four digits or more. The words for the engine's LotTextProblem and LoadProblem values come
     /// from explicit maps, never an enum's name, which cover every value the engine declares, found by reflection, so a
     /// new value fails here (and in the pins) at the next sync. The buttons and the headings read exactly as the design
-    /// gives them, and each entry of the shipped catalogue is titled "Example" or "Level n" by its place. Every line of the
-    /// catalogue's copy and every public string constant of Copy is printable ASCII and holds none of the banned words; the
-    /// text rules (TextRules) ban exactly jam, parking, bus, tray, board and block, and are shown to catch each planted
-    /// break. The tests run under tr-TR and under sv-SE, and the exact lines are the same under both.
+    /// gives them, and each entry of the shipped catalogue is titled "Example" or "Level n" by its place. The rules read
+    /// exactly their seven lines. Every line of the catalogue's copy, every public string constant of Copy and every line
+    /// of the rules is printable ASCII and holds none of the banned words; the text rules (TextRules) ban exactly jam,
+    /// parking, bus, tray, board and block, and are shown to catch each planted break. The tests run under tr-TR and under
+    /// sv-SE, and the exact lines are the same under both.
     /// </summary>
     public sealed class CopyTests
     {
-        /// <summary>Copy's public string constants: the game's title, the problem screen's sentence, five buttons and three headings.</summary>
-        private const int PublicStringConstants = 10;
+        /// <summary>Copy's public string constants: the game's title, the problem screen's sentence, seven buttons and four headings.</summary>
+        private const int PublicStringConstants = 13;
 
         private static readonly IReadOnlyDictionary<string, Func<LineCase>> LineCases = new Dictionary<string, Func<LineCase>>(StringComparer.Ordinal)
         {
@@ -65,8 +66,33 @@ namespace CoveredLot.Core.Tests
         public void The_buttons_and_the_headings_read_exactly_as_the_design_gives_them()
         {
             Assert.Equal(
-                new[] { "Levels", "Restart", "Play again", "Next level", "Retry", "Cleared!", "Still covered:", "Tags:" },
-                new[] { Copy.Levels, Copy.Restart, Copy.PlayAgain, Copy.NextLevel, Copy.Retry, Copy.ClearedHeading, Copy.StillCoveredHeading, Copy.TagsHeading });
+                new[] { "Levels", "Restart", "Play again", "Next level", "Retry", "Rules", "Back", "Cleared!", "Still covered:", "Tags:", "How to play" },
+                new[]
+                {
+                    Copy.Levels, Copy.Restart, Copy.PlayAgain, Copy.NextLevel, Copy.Retry, Copy.RulesButton, Copy.Back,
+                    Copy.ClearedHeading, Copy.StillCoveredHeading, Copy.TagsHeading, Copy.RulesHeading,
+                });
+        }
+
+        /// <summary>The rules' words are the user's interim ones (piece 13); P10 settles the game's own goal text.</summary>
+        [Fact]
+        public void The_rules_read_exactly_their_seven_lines_and_each_keeps_the_text_rules()
+        {
+            var expected = new[]
+            {
+                "Get every piece out to win.",
+                "Tap a piece to send it out the way its arrow points (^ > v <). It goes only if nothing is in its way.",
+                "Each piece that leaves waits in one of the bays below.",
+                "Three of one colour in the bays leave together and free their bays.",
+                "If every bay is full, the level is lost.",
+                "Grey pieces hide their colour until they leave. \"Still covered\" counts them by colour. A tag gives a clue: \"not R\" means not red.",
+                "\"Most bays used\" counts the most bays full at once. Match the par for 3 stars.",
+            };
+
+            IReadOnlyList<string> broken = Copy.RulesLines.SelectMany(line => CopyRules.BrokenBy(line).Select(rule => "'" + line + "' " + rule)).ToList();
+
+            Assert.Equal(expected, Copy.RulesLines);
+            Assert.True(broken.Count == 0, string.Join("\n", broken));
         }
 
         [Fact]

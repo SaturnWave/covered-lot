@@ -13,6 +13,7 @@
 :root {
   --cl-page: #F4F1EA;
   --cl-ink: #1D1D1D;
+  --cl-dev-ink: #6B6B6B;
   --cl-light-ink: #FFFFFF;
   --cl-outline: #C8C2B4;
   --cl-button: #E2DCCF;
@@ -47,7 +48,12 @@
   flex-grow: 1;
 }
 
-/* The top bar: Levels on the left, the title in the middle, Restart on the right. */
+/* The play field: the status line and the lot's frame, which an end card covers; the bays and the HUD stay under it. */
+.cl-play-field {
+  flex-grow: 1;
+}
+
+/* The top bar: Levels and Rules on the left, the title in the middle, Restart on the right. */
 .cl-top-bar {
   flex-direction: row;
   align-items: center;
@@ -84,8 +90,11 @@
   background-color: var(--cl-button-pressed);
 }
 
+/* The status line keeps the height of two lines of text, the longest it writes ("Cover lifted: yellow. Three yellow
+   cleared." wraps on a phone), whether it is empty or not, so the lot never moves when text comes or goes. One line
+   measured 25.7 units on piece 12's phone and 28 in the editor's test panel. */
 .cl-status {
-  min-height: 24px;
+  min-height: 52px;
   margin: 2px 8px;
   font-size: 16px;
   -unity-text-align: middle-center;
@@ -391,7 +400,7 @@
   color: var(--cl-ink);
 }
 
-/* An end card: opaque over the play area, so the lot under it takes no tap. */
+/* An end card: opaque over the play field, so the lot under it takes no tap; the bays and the HUD under the field stay in view. */
 .cl-card {
   position: absolute;
   left: 0;
@@ -423,13 +432,56 @@
   margin-top: 8px;
 }
 
-/* The level list and the problem screen, until piece 13 brings their own: centred on the page. */
+/* The level list: the title, the Rules button and the culture button at the top, then the entries' buttons, which scroll. */
 .cl-level-list {
   flex-grow: 1;
-  align-items: center;
-  justify-content: center;
 }
 
+.cl-level-list > .cl-title {
+  flex-grow: 0;
+  margin: 16px 8px 8px 8px;
+}
+
+.cl-level-list > .cl-button {
+  align-self: center;
+  min-width: 200px;
+}
+
+.cl-level-scroll {
+  flex-grow: 1;
+  margin: 8px 0 0 0;
+}
+
+.cl-level-button {
+  align-self: center;
+  min-width: 200px;
+}
+
+/* The rules, shown in place of a screen inside the safe-area padding until Back closes them. */
+.cl-rules {
+  flex-grow: 1;
+  padding: 16px 8px;
+}
+
+.cl-rules > .cl-title {
+  flex-grow: 0;
+  margin: 0 8px 12px 8px;
+}
+
+.cl-rules-line {
+  margin: 0 8px 10px 8px;
+  font-size: 16px;
+  white-space: normal;
+  color: var(--cl-ink);
+}
+
+.cl-rules > .cl-button {
+  align-self: center;
+  min-width: 180px;
+  margin-top: 8px;
+}
+
+/* The problem screen: its sentence centred on the page, and in development builds a small grey line per problem. */
 .cl-problems {
   flex-grow: 1;
   align-items: center;
@@ -441,4 +493,21 @@
   font-size: 16px;
   -unity-text-align: middle-center;
   color: var(--cl-ink);
+}
+
+.cl-problem-line {
+  margin: 2px 16px;
+  font-size: 12px;
+  white-space: normal;
+  -unity-text-align: middle-center;
+  color: var(--cl-dev-ink);
+}
+
+/* The development line, in development builds only: small grey text at the foot of the screens. */
+.cl-dev-line {
+  margin: 2px 8px;
+  font-size: 12px;
+  white-space: normal;
+  -unity-text-align: middle-center;
+  color: var(--cl-dev-ink);
 }

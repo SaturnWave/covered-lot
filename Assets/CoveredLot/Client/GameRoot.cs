@@ -1,4 +1,3 @@
-using System;
 using CoveredLot.Core.Catalogue;
 using CoveredLot.Core.Layout;
 using CoveredLot.Core.Navigation;
@@ -11,15 +10,14 @@ namespace CoveredLot.Client
     /// <summary>
     /// The game's one MonoBehaviour and its composition root (design sections 6 and 8.5). It sits on the Main scene's Game
     /// object next to the UIDocument and finds that document itself, so it has no serialized reference fields. In Awake it
-    /// loads the catalogue once, through ResourcesLevelTexts, makes the navigator, opens the Example when the catalogue is
-    /// ready (piece 13 starts on the level list instead), and builds the screens once. It keeps them in the document's
-    /// root, its safe-area padding current and the screen awake while a level is open (<see cref="DocumentScreens"/>).
+    /// loads the catalogue once, through ResourcesLevelTexts, makes the navigator, which starts on the level list (or on
+    /// the problem screen when the catalogue did not load), and builds the screens once, with the development line and the
+    /// culture button only in a development build (Debug.isDebugBuild). It keeps them in the document's root, its
+    /// safe-area padding current, the development line told of each change of the device's screen, and the screen awake
+    /// while a level is open (<see cref="DocumentScreens"/>).
     /// </summary>
     public sealed class GameRoot : MonoBehaviour
     {
-        /// <summary>The Example's index in the level list: the catalogue puts it first.</summary>
-        private const int ExampleIndex = 0;
-
         /// <summary>The screens in the document; null when Awake found no UIDocument, and this component disabled itself.</summary>
         private DocumentScreens? _screens;
 
@@ -34,7 +32,7 @@ namespace CoveredLot.Client
                 return;
             }
 
-            _screens = new DocumentScreens(document, OpenedNavigator());
+            _screens = new DocumentScreens(document, new Navigator(LevelCatalogue.Load(new ResourcesLevelTexts())), Debug.isDebugBuild);
         }
 
         /// <summary>
@@ -54,7 +52,7 @@ namespace CoveredLot.Client
             if (_screens is not null)
             {
                 _screens.KeepInDocument();
-                _screens.KeepSafeAreaPadding();
+                _screens.KeepUpWithTheScreen();
                 _screens.KeepAwakeWhileALevelIsOpen();
             }
         }
@@ -68,14 +66,6 @@ namespace CoveredLot.Client
             }
         }
 
-        /// <summary>The navigator over the catalogue Resources holds, with the Example open. A catalogue that did not load shows the problem screen, where Open changes nothing.</summary>
-        private static Navigator OpenedNavigator()
-        {
-            var navigator = new Navigator(LevelCatalogue.Load(new ResourcesLevelTexts()));
-            navigator.Open(ExampleIndex);
-            return navigator;
-        }
-
         /// <summary>
         /// The screens, which this object keeps in its UIDocument, and the state of the device that follows them.
         /// <list type="bullet">
@@ -85,7 +75,8 @@ namespace CoveredLot.Client
         /// enabled again.</description></item>
         /// <item><description>The safe-area padding: the screen's size and safe area in pixels and the panel's size in
         /// units, made whole and non-negative (<see cref="Whole"/>), give SafeInsets, which the host takes as its padding
-        /// whenever it differs from the padding it has.</description></item>
+        /// whenever it differs from the padding it has. When the screen's size or safe area differs from the last seen,
+        /// the host also writes its development line again.</description></item>
         /// <item><description>The sleep timeout: NeverSleep while a level is open, and the device's own setting on any
         /// other screen, set whenever it should change.</description></item>
         /// </list>
@@ -99,14 +90,17 @@ namespace CoveredLot.Client
             /// <summary>The padding the host has; None until the first padding is worked out.</summary>
             private Option<SafeInsets> _padding;
 
+            /// <summary>The screen as it was last seen; None until it is first seen.</summary>
+            private Option<ScreenFacts> _screen;
+
             /// <summary>The sleep timeout set last; None when it has not been set since this was made or since LetSleep.</summary>
             private Option<int> _sleepTimeout;
 
-            public DocumentScreens(UIDocument document, Navigator navigator)
+            public DocumentScreens(UIDocument document, Navigator navigator, bool developmentBuild)
             {
                 _document = document;
                 _navigator = navigator;
-                _host = new ScreenHost(navigator);
+                _host = new ScreenHost(navigator, developmentBuild);
             }
 
             /// <summary>Puts the screens into the document's current root, unless they are there already; a disabled document has no root.</summary>
@@ -119,7 +113,8 @@ namespace CoveredLot.Client
                 }
             }
 
-            public void KeepSafeAreaPadding()
+            /// <summary>Keeps the safe-area padding current, and the development line told when the screen's size or safe area changes.</summary>
+            public void KeepUpWithTheScreen()
             {
                 IPanel? panel = _host.panel;
                 if (panel is null)
@@ -127,11 +122,18 @@ namespace CoveredLot.Client
                     return;
                 }
 
-                SafeInsets padding = SafeInsets.ToPanel(ScreenSize(), SafeArea(), PanelSizeOf(panel));
+                ScreenFacts screen = ScreenFacts.Now();
+                SafeInsets padding = SafeInsets.ToPanel(screen.Size, screen.SafeArea, PanelSizeOf(panel));
                 if (!_padding.TryGet(out SafeInsets current) || !SamePadding(current, padding))
                 {
                     _host.Pad(padding);
                     _padding = Option.Some(padding);
+                }
+
+                if (!_screen.TryGet(out ScreenFacts seen) || !seen.Matches(screen))
+                {
+                    _screen = Option.Some(screen);
+                    _host.RefreshDevLine();
                 }
             }
 
@@ -149,23 +151,6 @@ namespace CoveredLot.Client
             {
                 Screen.sleepTimeout = SleepTimeout.SystemSetting;
                 _sleepTimeout = Option.None<int>();
-            }
-
-            private static PixelSize ScreenSize() =>
-                new PixelSize(new HorizontalPixels(Math.Max(0, Screen.width)), new VerticalPixels(Math.Max(0, Screen.height)));
-
-            /// <summary>
-            /// Screen.safeArea in whole pixels from the screen's bottom-left corner. Its left and bottom edges are rounded
-            /// up and its right and top edges down, so a fraction of a pixel never moves an edge into a cutout.
-            /// </summary>
-            private static PixelRect SafeArea()
-            {
-                Rect safe = Screen.safeArea;
-                int left = Whole.Ceiling(safe.xMin);
-                int bottom = Whole.Ceiling(safe.yMin);
-                int width = Math.Max(0, Whole.Floor(safe.xMax) - left);
-                int height = Math.Max(0, Whole.Floor(safe.yMax) - bottom);
-                return new PixelRect(new HorizontalPixels(left), new VerticalPixels(bottom), new PixelSize(new HorizontalPixels(width), new VerticalPixels(height)));
             }
 
             /// <summary>The panel's size in its own units, as its root's layout gives it: 360 units wide on every phone.</summary>

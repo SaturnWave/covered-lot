@@ -19,10 +19,10 @@ namespace CoveredLot.Tests.EditMode
     /// The play screen, clicked as a player clicks it (design sections 9 and 10.3), in a panel of the UI Test Framework
     /// that no window shows: 360 x 800 units, a phone's panel, with the game's own theme (CoveredLotTheme.tss: Unity's
     /// default runtime theme, then CoveredLot.uss), under the culture the run names. Each test but the variant's builds the
-    /// screens over the catalogue that the Client's ResourcesLevelTexts loads, with the Example open, as GameRoot does, and
-    /// lets the panel update after every click. The Example's tiles stand in PieceId order in the tile layer, and its ghosts
-    /// in the ghost layer, so tile n is vehicle n's; Level 1, which the win card's Next level opens, has nine vehicles too.
-    /// The counts are asserted, so no check passes on an empty list.
+    /// screens of a development build over the catalogue that the Client's ResourcesLevelTexts loads, with the Example
+    /// open, and lets the panel update after every click. The Example's tiles stand in PieceId order in the tile layer, and
+    /// its ghosts in the ghost layer, so tile n is vehicle n's; Level 1, which the win card's Next level opens, has nine
+    /// vehicles too. The counts are asserted, so no check passes on an empty list.
     /// </summary>
     [HostileCulture]
     public sealed class PlayScreenTests : UITestFixture
@@ -47,7 +47,9 @@ namespace CoveredLot.Tests.EditMode
 
         private const float SmallestButtonSide = 48f;
         private const float SmallestFontSize = 14f;
-        private const float SmallestBadgeFontSize = 12f;
+
+        /// <summary>The smallest font of a badge's number and of the development line, which only development builds show.</summary>
+        private const float SmallestBadgeOrDevFontSize = 12f;
 
         /// <summary>The ink of CoveredLot.uss, --cl-ink, which the lines and headings show.</summary>
         private const string InkColour = "#1D1D1D";
@@ -170,11 +172,65 @@ namespace CoveredLot.Tests.EditMode
                 }
             }
 
-            Assert.That(ShownElements.LabelTexts(card), Is.EqualTo(new[] { "All bays are full." }), "the fail card's lines");
+            Assert.That(ShownElements.LabelTexts(card), Is.EqualTo(new[] { "All bays are full.", "Three of one colour leave the bays together." }), "the fail card's lines");
             Assert.That(ShownElements.ButtonTexts(card), Is.EqualTo(new[] { Copy.Retry, Copy.Levels }), "the fail card's buttons");
             Assert.That(tiles.Count, Is.EqualTo(5), "the tiles left under the card: vehicles 2, 4, 5, 6 and 7");
             Assert.That(pickedPastTheCard, Is.Empty, "the tiles a click at their centre reaches past the card");
             Assert.That(ColourText(card.resolvedStyle.backgroundColor), Is.EqualTo(ColourText(page)), "the fail card's fill: the page colour " + PageColour + " at full alpha");
+        }
+
+        /// <summary>
+        /// Piece 12's play: the fail card hid the bays that ended the level. The card now covers the play field alone, the
+        /// status line and the lot, so the bays row lies wholly under it and shows the four colours that never made three.
+        /// </summary>
+        [Test]
+        public void The_fail_card_covers_the_lot_alone_so_the_full_bays_B_B_R_Y_stay_in_view_under_it()
+        {
+            ScreenHost host = ShowExample();
+
+            ClickAll(host, FailingLine);
+            Rect card = TheShownCard(host).worldBound;
+            List<VisualElement> rows = ShownElements.WithClass(host, StyleNames.Bays);
+
+            Assert.That(rows.Count, Is.EqualTo(1), "the bays rows shown");
+            Assert.That(rows[0].worldBound.yMin, Is.GreaterThanOrEqualTo(card.yMax), "the top of the bays row against the foot of the fail card");
+            Assert.That(BaysOf(host), Is.EqualTo(new[] { Filled("B", Swatch.Blue), Filled("B", Swatch.Blue), Filled("R", Swatch.Red), Filled("Y", Swatch.Yellow) }), "the bays under the fail card");
+        }
+
+        /// <summary>Piece 12's phone showed the lot moving down when the status line got its text; the empty line now keeps the text's height.</summary>
+        [Test]
+        public void A_bump_writes_the_status_line_without_moving_the_lot()
+        {
+            ScreenHost host = ShowExample();
+            float lotTop = host.Play.Board.worldBound.yMin;
+
+            Click(host, 5);
+
+            Assert.That(StatusOf(host), Is.EqualTo("Something is in its way."), "the premise: the status line after the bump");
+            Assert.That(host.Play.Board.worldBound.yMin, Is.EqualTo(lotTop), "the top of the lot's frame after the bump, against before it");
+        }
+
+        /// <summary>The rules take the play screen's place and give it back as it was: the attempt is not restarted.</summary>
+        [Test]
+        public void Rules_on_the_top_bar_shows_the_rules_and_Back_brings_the_level_back_as_it_was()
+        {
+            ScreenHost host = ShowExample();
+            ClickAll(host, 0, 3);
+
+            ClickButton(host, Copy.RulesButton);
+            int rulesShown = ShownElements.WithClass(host, StyleNames.Rules).Count;
+            List<string> headings = ShownTexts(host, StyleNames.Title);
+            List<string> lines = ShownTexts(host, StyleNames.RulesLine);
+            List<VisualElement> playShown = ShownElements.WithClass(host, StyleNames.Play);
+            ClickButton(host, Copy.Back);
+
+            Assert.That(rulesShown, Is.EqualTo(1), "the rules shown after Rules");
+            Assert.That(headings, Is.EqualTo(new[] { Copy.RulesHeading }), "the titles shown with the rules: the rules' heading alone");
+            Assert.That(lines, Is.EqualTo(Copy.RulesLines), "the rules' lines");
+            Assert.That(playShown, Is.Empty, "the play screens shown with the rules");
+            Assert.That(ShownElements.WithClass(host, StyleNames.Rules), Is.Empty, "the rules shown after Back");
+            Assert.That(StatusOf(host), Is.EqualTo("Cover lifted: blue."), "the status line after Back: the one tap 3 gave");
+            Assert.That(ShownTiles(host).Count, Is.EqualTo(ExampleVehicles - 2), "the tiles shown after Back: all but vehicles 0 and 3");
         }
 
         /// <summary>
@@ -267,15 +323,15 @@ namespace CoveredLot.Tests.EditMode
 
         /// <summary>
         /// The screen in play, with the win card and with the fail card, so every button of both cards is measured. What
-        /// shows (design section 9) adds up to these counts on the Example: in play, the 2 buttons of the top bar and 26
+        /// shows (design section 9) adds up to these counts on the Example: in play, the 3 buttons of the top bar and 27
         /// labels (the title, the status line, the pillar's glyph, 9 tile labels and tile 3's badge, 4 bay letters, the 2
-        /// HUD lines, the ledger's heading and 3 pills, and the tags list's heading, badge and line); with the win card, 5
-        /// buttons and 29 labels (the 9 ghosts' labels and ghost 3's badge in place of the tiles', and the card's 3 lines);
-        /// with the fail card, 4 buttons and 27 labels (5 tiles left, without a badge, the 4 ghosts of the vehicles gone,
-        /// with ghost 3's badge, and the card's 1 line).
+        /// HUD lines, the ledger's heading and 3 pills, the tags list's heading, badge and line, and the development line);
+        /// with the win card, 6 buttons and 30 labels (the 9 ghosts' labels and ghost 3's badge in place of the tiles', and
+        /// the card's 3 lines); with the fail card, 5 buttons and 29 labels (5 tiles left, without a badge, the 4 ghosts of
+        /// the vehicles gone, with ghost 3's badge, and the card's 2 lines).
         /// </summary>
         [Test]
-        public void Each_button_is_at_least_48_by_48_and_each_label_at_least_14_or_12_for_a_badge_in_play_and_on_both_cards()
+        public void Each_button_is_at_least_48_by_48_and_each_label_at_least_14_or_12_for_a_badge_or_the_dev_line_in_play_and_on_both_cards()
         {
             ScreenHost host = ShowExample();
             Measured inPlay = Measure(host);
@@ -285,8 +341,8 @@ namespace CoveredLot.Tests.EditMode
             ClickAll(host, FailingLine);
             Measured onTheFailCard = Measure(host);
 
-            Assert.That(new[] { inPlay.Buttons, onTheWinCard.Buttons, onTheFailCard.Buttons }, Is.EqualTo(new[] { 2, 5, 4 }), "the buttons shown in play, with the win card and with the fail card");
-            Assert.That(new[] { inPlay.Labels, onTheWinCard.Labels, onTheFailCard.Labels }, Is.EqualTo(new[] { 26, 29, 27 }), "the labels shown in play, with the win card and with the fail card");
+            Assert.That(new[] { inPlay.Buttons, onTheWinCard.Buttons, onTheFailCard.Buttons }, Is.EqualTo(new[] { 3, 6, 5 }), "the buttons shown in play, with the win card and with the fail card");
+            Assert.That(new[] { inPlay.Labels, onTheWinCard.Labels, onTheFailCard.Labels }, Is.EqualTo(new[] { 27, 30, 29 }), "the labels shown in play, with the win card and with the fail card");
             Assert.That(inPlay.TooSmall, Is.Empty, "what is too small in play");
             Assert.That(onTheWinCard.TooSmall, Is.Empty, "what is too small with the win card");
             Assert.That(onTheFailCard.TooSmall, Is.Empty, "what is too small with the fail card");
@@ -388,13 +444,13 @@ namespace CoveredLot.Tests.EditMode
 
         private ScreenHost ShowExample() => Show(LevelCatalogue.Load(new ResourcesLevelTexts()));
 
-        /// <summary>The screens over the catalogue, with its first entry open, in the panel, laid out.</summary>
+        /// <summary>The screens of a development build over the catalogue, with its first entry open, in the panel, laid out.</summary>
         private ScreenHost Show(CatalogueResult catalogue)
         {
             var navigator = new Navigator(catalogue);
             navigator.Open(0);
             Assert.That(navigator.Screen, Is.InstanceOf<AppScreen.Playing>(), "the screen after opening the catalogue's first entry");
-            var host = new ScreenHost(navigator);
+            var host = new ScreenHost(navigator, developmentBuild: true);
             rootVisualElement.Add(host);
             Settle();
             return host;
@@ -558,7 +614,7 @@ namespace CoveredLot.Tests.EditMode
 
             foreach (Label label in labels)
             {
-                float smallest = label.ClassListContains(StyleNames.Badge) ? SmallestBadgeFontSize : SmallestFontSize;
+                float smallest = label.ClassListContains(StyleNames.Badge) || label.ClassListContains(StyleNames.DevLine) ? SmallestBadgeOrDevFontSize : SmallestFontSize;
                 if (!(label.resolvedStyle.fontSize >= smallest))
                 {
                     tooSmall.Add("label '" + label.text + "' (" + string.Join(" ", label.GetClasses()) + ") has font size " + Size(label.resolvedStyle.fontSize) + ", under " + Size(smallest));

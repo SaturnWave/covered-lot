@@ -35,7 +35,7 @@ namespace CoveredLot.Core.Tests
             IReadOnlyList<string> unstyled = named.Where(name => !styled.Contains(name)).ToList();
             IReadOnlyList<string> unnamed = styled.Where(name => !named.Contains(name, StringComparer.Ordinal)).OrderBy(name => name, StringComparer.Ordinal).ToList();
 
-            Assert.Equal(43, named.Count);
+            Assert.Equal(50, named.Count);
             Assert.True(unstyled.Count == 0, StyleSheet + " has no rule for " + string.Join(", ", unstyled));
             Assert.True(unnamed.Count == 0, StyleSheet + " styles classes StyleNames does not name: " + string.Join(", ", unnamed));
         }

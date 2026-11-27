@@ -6,7 +6,8 @@ namespace CoveredLot.Core.Pictures
     /// The USS class names of what the screens show (design sections 6, 7 and 9), the names CoveredLot.uss styles and the
     /// Client puts on its elements: the screens and their parts, the buttons, the lot and its cells, the pillars, the tiles
     /// with their covered face and their blocker mark, the ghosts, the badges, the Ahead links, the HUD with its bays, its
-    /// lines, its ledger and its tags list, the end cards, and one class for each swatch. Every colour, size, border and
+    /// lines, its ledger and its tags list, the end cards, the level list, the rules, the problem screen's lines, the
+    /// development line, and one class for each swatch. Every colour, size, border and
     /// spacing lives in the USS; these names are all the Client and the USS share.
     /// </summary>
     public static class StyleNames
@@ -17,20 +18,26 @@ namespace CoveredLot.Core.Pictures
         /// <summary>The play screen: its top bar above its play area.</summary>
         public const string Play = "cl-play";
 
-        /// <summary>The play screen's top bar: the Levels button, the entry's title and the Restart button.</summary>
+        /// <summary>The play screen's top bar: the Levels button, the Rules button, the entry's title and the Restart button.</summary>
         public const string TopBar = "cl-top-bar";
 
-        /// <summary>A title: the entry's on the top bar, the game's on the level list.</summary>
+        /// <summary>A title: the entry's on the top bar, the game's on the level list, and the rules' heading.</summary>
         public const string Title = "cl-title";
 
         /// <summary>Every button the screens show, at least 48 x 48 units (design section 6).</summary>
         public const string Button = "cl-button";
 
         /// <summary>
-        /// What the play screen shows under its top bar: the status line, the lot's frame, the bays and the HUD's lines,
-        /// the ledger and the tags list, and an end card over all of them once the level is over.
+        /// What the play screen shows under its top bar: the play field, then the bays and the HUD's lines, the ledger and
+        /// the tags list.
         /// </summary>
         public const string PlayArea = "cl-play-area";
+
+        /// <summary>
+        /// The part of the play area an end card covers once the level is over: the status line and the lot's frame. The
+        /// bays, the HUD's lines, the ledger and the tags list stay in view under it.
+        /// </summary>
+        public const string PlayField = "cl-play-field";
 
         /// <summary>The status line, which says what the last tap did.</summary>
         public const string Status = "cl-status";
@@ -107,23 +114,41 @@ namespace CoveredLot.Core.Pictures
         /// <summary>The tags of one row of the tags list, after its badge: "not R, not Y".</summary>
         public const string TagLine = "cl-tag-line";
 
-        /// <summary>An end card, the win card or the fail card: opaque over the play area, so it takes every tap there.</summary>
+        /// <summary>An end card, the win card or the fail card: opaque over the play field, so it takes every tap there.</summary>
         public const string Card = "cl-card";
 
         /// <summary>An end card's heading: "Cleared!", or the sentence of a fail, "All bays are full."</summary>
         public const string CardHeading = "cl-card-heading";
 
-        /// <summary>A line of the win card under its heading: the stars, and the peak against the par.</summary>
+        /// <summary>A line of an end card under its heading: the win card's stars and its peak against the par, and the fail card's rule.</summary>
         public const string CardLine = "cl-card-line";
 
-        /// <summary>The level list.</summary>
+        /// <summary>The level list: the game's title, the Rules button, the culture button in development builds, and the entries.</summary>
         public const string LevelList = "cl-level-list";
+
+        /// <summary>The level list's scrolling part, which holds a button for each entry.</summary>
+        public const string LevelScroll = "cl-level-scroll";
+
+        /// <summary>The button of an entry of the level list: "Example", "Level 12".</summary>
+        public const string LevelButton = "cl-level-button";
+
+        /// <summary>The rules: their heading, their lines and the Back button, shown in place of a screen until Back closes them.</summary>
+        public const string Rules = "cl-rules";
+
+        /// <summary>A line of the rules.</summary>
+        public const string RulesLine = "cl-rules-line";
 
         /// <summary>The problem screen, which a catalogue that did not load shows.</summary>
         public const string Problems = "cl-problems";
 
         /// <summary>The problem screen's sentence.</summary>
         public const string Message = "cl-message";
+
+        /// <summary>A line of the problem screen for one problem, which only development builds show.</summary>
+        public const string ProblemLine = "cl-problem-line";
+
+        /// <summary>The development line at the foot of the screens, which only development builds show: small grey text.</summary>
+        public const string DevLine = "cl-dev-line";
 
         /// <summary>The class that paints a swatch: the fill of an open tile or a filled bay, the outline of a ghost or a pill.</summary>
         public static string Of(Swatch swatch) => swatch switch

@@ -16,9 +16,9 @@ namespace CoveredLot.Core
     /// Every string the game shows lives here, so a change of wording is a one-line edit (design section 9). The copy keeps
     /// the text rules (<see cref="TextRules"/>): it is printable ASCII and holds none of the banned words, development lines
     /// included. It writes numbers with the invariant culture only, so a line reads the same on every device. It holds the
-    /// game's title, the entries' titles, the buttons and the headings, the HUD's lines, the status lines, the end card's
-    /// lines, the board's and the tags list's words and glyphs, the problem screen's lines, and the development line and
-    /// its culture button. The pictures hold every string they show, so the members that only the pictures use are
+    /// game's title, the entries' titles, the buttons and the headings, the rules, the HUD's lines, the status lines, the
+    /// end card's lines, the board's and the tags list's words and glyphs, the problem screen's lines, and the development
+    /// line and its culture button. The pictures hold every string they show, so the members that only the pictures use are
     /// internal, and the public ones are what the screens show by themselves.
     /// </summary>
     public static class Copy
@@ -53,6 +53,15 @@ namespace CoveredLot.Core
         /// <summary>The fail card's button that starts the level again.</summary>
         public const string Retry = "Retry";
 
+        /// <summary>The button that opens the rules: on the level list, and on the play screen's top bar.</summary>
+        public const string RulesButton = "Rules";
+
+        /// <summary>The heading of the rules.</summary>
+        public const string RulesHeading = "How to play";
+
+        /// <summary>The rules' button that closes them and shows again the screen they cover.</summary>
+        public const string Back = "Back";
+
         /// <summary>What a covered vehicle's label shows in place of its colour's letter, as in "?v".</summary>
         internal const string HiddenColourGlyph = "?";
 
@@ -68,6 +77,9 @@ namespace CoveredLot.Core
         /// <summary>The fail card's sentence when no vehicle can leave, Failed(NoLegalMove), which no loaded level reaches (BRIEF:47).</summary>
         internal const string NoMovePossible = "No move is possible.";
 
+        /// <summary>The fail card's line under "All bays are full.": the rule that frees bays, as the bays left in view show it broken.</summary>
+        internal const string ThreeOfOneColourLeave = "Three of one colour leave the bays together.";
+
         private const string PresentationLabel = "presentation";
         private const string ExampleLabel = "example";
 
@@ -79,6 +91,21 @@ namespace CoveredLot.Core
 
         /// <summary>What stands between the parts of the development line, as in "slot 0024 | par 4".</summary>
         private const string DevLineSeparator = " | ";
+
+        /// <summary>
+        /// The rules, one line each, in the simple UI's interim words (piece 13, on the user's word of 2026-11-28): the goal,
+        /// the tap, the bays, the set of three, the fail, the covers with the ledger and the tags, and the stars. P10 settles
+        /// the game's own goal text and the theme's words; until then these lines keep the text rules, as every string the
+        /// game shows does.
+        /// </summary>
+        public static ReadOnlyArray<string> RulesLines { get; } = ReadOnlyArray.Of(
+            "Get every piece out to win.",
+            "Tap a piece to send it out the way its arrow points (^ > v <). It goes only if nothing is in its way.",
+            "Each piece that leaves waits in one of the bays below.",
+            "Three of one colour in the bays leave together and free their bays.",
+            "If every bay is full, the level is lost.",
+            "Grey pieces hide their colour until they leave. \"Still covered\" counts them by colour. A tag gives a clue: \"not R\" means not red.",
+            "\"Most bays used\" counts the most bays full at once. Match the par for 3 stars.");
 
         /// <summary>What the level list and the top bar call an entry: "Example", or "Level 12" for the twelfth listed level.</summary>
         public static string TitleOf(EntryTitle title) => title switch

@@ -90,7 +90,7 @@ namespace CoveredLot.Core.Tests
 
             Assert.Empty(notMoved);
             Assert.Equal(new[] { "3 stars", "Most bays used: 3 (par 3)" }, PictureStrings.Of(EndPicture.Of(won)));
-            Assert.Equal(new[] { "All bays are full." }, PictureStrings.Of(EndPicture.Of(failed)));
+            Assert.Equal(new[] { "All bays are full.", "Three of one colour leave the bays together." }, PictureStrings.Of(EndPicture.Of(failed)));
         }
 
         /// <summary>Taps the level's par path through a new session, checking the pictures' strings at the start and after every tap.</summary>

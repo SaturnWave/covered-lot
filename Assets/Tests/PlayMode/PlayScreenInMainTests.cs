@@ -16,8 +16,9 @@ namespace CoveredLot.Tests.PlayMode
     /// <summary>
     /// The Example played by clicks in the Main scene in Play mode (design section 10.3), through the UI Test Framework's
     /// RuntimeUITestFixture on the Game object's own UIDocument (SetUIContent), under the culture the run names: the scene
-    /// loads in [UnitySetUp] and GameRoot opens the Example, as at boot. The Example's tiles stand in PieceId order in the
-    /// tile layer, so tile n is vehicle n's.
+    /// loads in [UnitySetUp], GameRoot starts on the level list, as at boot, and each test opens the Example with the
+    /// list's button, as a player does. The Example's tiles stand in PieceId order in the tile layer, so tile n is vehicle
+    /// n's.
     /// <para>
     /// The editor's batch-mode screen is 640 x 480 pixels, which the game's panel settings, matched on the width, make a
     /// panel of 360 x 270 units: too low for the play screen's lot, and a runtime panel drops a pointer event below its
@@ -33,6 +34,9 @@ namespace CoveredLot.Tests.PlayMode
 
         /// <summary>The Example's vehicles, ids 0 to 8.</summary>
         private const int ExampleVehicles = 9;
+
+        /// <summary>The title of the Example's button on the level list.</summary>
+        private const string ExampleTitle = "Example";
 
         /// <summary>The panel updates a click needs: the repaint's styles, the layout, and the layout a geometry change makes.</summary>
         private const int UpdatesToSettle = 3;
@@ -110,10 +114,11 @@ namespace CoveredLot.Tests.PlayMode
         }
 
         [UnityTest]
-        public IEnumerator Clicking_the_winning_line_shows_the_win_card_and_Play_again_brings_the_covers_back()
+        public IEnumerator From_the_list_the_Example_s_winning_line_shows_the_win_card_and_Play_again_brings_the_covers_back()
         {
             UIDocument document = GameDocument();
             Follow(document);
+            Click(TheButton(document, ExampleTitle));
 
             foreach (int piece in WinningLine)
             {
@@ -141,6 +146,7 @@ namespace CoveredLot.Tests.PlayMode
         {
             UIDocument document = GameDocument();
             Follow(document);
+            Click(TheButton(document, ExampleTitle));
             Click(TileOf(document, 0));
             Click(TileOf(document, 3));
             IReadOnlyList<string> statusBefore = ShownTexts(document.rootVisualElement, StyleNames.Status);

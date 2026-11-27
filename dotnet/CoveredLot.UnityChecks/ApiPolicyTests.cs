@@ -12,8 +12,11 @@ namespace CoveredLot.UnityChecks
     /// nothing the full Unity-bound API policy refuses (its allowlist, its member bans and its unordered-sequence rules),
     /// as its .NET build already shows; PuzzleCore and PuzzleCore.Jam, the engine DLLs of Assets/Generated/PuzzleCore that
     /// its asmdef names, are its siblings, whose types are no platform APIs. The Client and the Editor, which may use
-    /// UnityEngine, files and floats, use none of the members the policy bans (MemberBansPolicy). The policy's known gaps
-    /// are in its remarks; CoveredLot.Core.Tests shows each scan on planted samples (ApiPolicyTests there).
+    /// UnityEngine, files and floats, use none of the members the policy bans (MemberBansPolicy), apart from the one
+    /// reviewed exemption (ReviewedExemptions): the Client's DevCultureSwitch reads the culture the game runs in. That
+    /// exemption is shown to cover reads Unity's build of the Client really makes, and nothing in the Editor's. The
+    /// policy's known gaps are in its remarks; CoveredLot.Core.Tests shows each scan on planted samples (ApiPolicyTests
+    /// there) and the exemption on planted violations (ReviewedExemptionsTests).
     /// </summary>
     public sealed class ApiPolicyTests
     {
@@ -52,11 +55,25 @@ namespace CoveredLot.UnityChecks
 
         [Theory]
         [MemberData(nameof(ClientAndEditor))]
-        public void Unity_built_Client_and_Editor_use_no_banned_member(string name)
+        public void Unity_built_Client_and_Editor_use_no_banned_member_beyond_the_reviewed_exemption(string name)
         {
             using AssemblyScanner scanner = UnityOutputs.Scan(name);
 
-            AssertNone("Unity's build of " + name + " uses what the member bans refuse", scanner.ApiPolicyViolations(MemberBansPolicy.Default));
+            AssertNone("Unity's build of " + name + " uses what the member bans refuse", ReviewedExemptions.Without(scanner.ApiPolicyViolations(MemberBansPolicy.Default)));
+        }
+
+        /// <summary>The exemption is no blank cheque: it covers both culture reads that DevCultureSwitch really makes, and the Editor needs it nowhere.</summary>
+        [Fact]
+        public void The_reviewed_exemption_covers_both_culture_reads_of_Unity_built_DevCultureSwitch_and_nothing_in_the_Editor()
+        {
+            using AssemblyScanner client = UnityOutputs.Scan("CoveredLot.Client");
+            using AssemblyScanner editor = UnityOutputs.Scan("CoveredLot.Editor");
+
+            IReadOnlyList<Violation> covered = ReviewedExemptions.Covered(client.ApiPolicyViolations(MemberBansPolicy.Default));
+
+            Assert.Contains(covered, violation => violation.Reason.StartsWith("System.Globalization.CultureInfo::get_CurrentCulture(): ", StringComparison.Ordinal));
+            Assert.Contains(covered, violation => violation.Reason.StartsWith("System.Globalization.CultureInfo::get_CurrentUICulture(): ", StringComparison.Ordinal));
+            Assert.Empty(ReviewedExemptions.Covered(editor.ApiPolicyViolations(MemberBansPolicy.Default)));
         }
 
         private static void AssertNone(string heading, IReadOnlyList<Violation> violations) =>

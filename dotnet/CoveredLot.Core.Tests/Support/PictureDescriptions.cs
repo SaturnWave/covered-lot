@@ -28,15 +28,15 @@ namespace CoveredLot.Core.Tests.Support
         public static string Pill(LedgerPill pill) => pill.Text + " " + pill.Swatch.ToString();
 
         /// <summary>
-        /// "Playing", "Cleared(Three, 3 stars, Most bays used: 3 (par 3))", "BaysFull(All bays are full.)" or "NoMoveLeft(No
-        /// move is possible.)". A kind of card the tests do not know is described by its type, so a comparison fails on it
-        /// without a throw.
+        /// "Playing", "Cleared(Three, 3 stars, Most bays used: 3 (par 3))", "BaysFull(All bays are full., Three of one colour
+        /// leave the bays together.)" or "NoMoveLeft(No move is possible.)". A kind of card the tests do not know is described
+        /// by its type, so a comparison fails on it without a throw.
         /// </summary>
         public static string End(EndPicture end) => end switch
         {
             EndPicture.Playing => "Playing",
             EndPicture.Cleared cleared => "Cleared(" + cleared.Rating.ToString() + ", " + cleared.StarsLine + ", " + cleared.PeakLine + ")",
-            EndPicture.BaysFull full => "BaysFull(" + full.Text + ")",
+            EndPicture.BaysFull full => "BaysFull(" + full.Text + ", " + full.Hint + ")",
             EndPicture.NoMoveLeft noMove => "NoMoveLeft(" + noMove.Text + ")",
             _ => "an unknown kind of card, " + end.GetType().Name,
         };
