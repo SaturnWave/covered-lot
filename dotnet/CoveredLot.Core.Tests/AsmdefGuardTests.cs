@@ -13,8 +13,9 @@ namespace CoveredLot.Core.Tests
     /// <summary>
     /// The Unity side of the compile rules (design sections 3, 8.1, 8.7 and 10a). The three CoveredLot assemblies are Core,
     /// the Client and the Editor, and each asmdef is pinned property by property: Core's keeps it Unity-free and lets it
-    /// see only the two engine DLLs, and the .NET build of Core references no more; the Client's and the Editor's
-    /// override the precompiled references with none, so neither compiles against the engine DLLs. The three test
+    /// see only the two engine DLLs, and the .NET build of Core references no more; the Client's overrides the
+    /// precompiled references with the two engine DLLs alone, whose types Core's pictures and session hand it, and the
+    /// Editor's with none, so it does not compile against the engine DLLs. The three test
     /// assemblies under Assets/Tests (Support, EditMode and PlayMode) are pinned the same way: each is built only with the
     /// tests (UNITY_INCLUDE_TESTS), referenced by no assembly that does not name it, and given NUnit, and the engine DLLs
     /// where its tests call the engine, by name. No other asmdef may sit under Assets/CoveredLot or Assets/Tests. No
@@ -69,10 +70,11 @@ namespace CoveredLot.Core.Tests
         };
 
         /// <summary>
-        /// The Client's asmdef: it references Core and overrides the precompiled references with none. Without the
-        /// override, Unity hands the game code the package DLLs whose import settings leave Auto Reference on, NUnit and
-        /// Mono.Cecil among them (seen in Unity's response file for the Client when piece 9 was reviewed). A piece that
-        /// gives the Client the engine DLLs names them here and in the asmdef in one commit.
+        /// The Client's asmdef: it references Core and overrides the precompiled references with the two engine DLLs alone,
+        /// since the pictures and the session it shows hand it the engine's types (PieceId, Option, ReadOnlyArray); piece
+        /// 11 named them here and in the asmdef in one commit. Without the override, Unity hands the game code the package
+        /// DLLs whose import settings leave Auto Reference on, NUnit and Mono.Cecil among them (seen in Unity's response
+        /// file for the Client when piece 9 was reviewed).
         /// </summary>
         private static readonly IReadOnlyDictionary<string, string> ExpectedClientAsmdef = new Dictionary<string, string>(StringComparer.Ordinal)
         {
@@ -83,7 +85,7 @@ namespace CoveredLot.Core.Tests
             ["excludePlatforms"] = "[]",
             ["allowUnsafeCode"] = "false",
             ["overrideReferences"] = "true",
-            ["precompiledReferences"] = "[]",
+            ["precompiledReferences"] = "[\"PuzzleCore.dll\",\"PuzzleCore.Jam.dll\"]",
             ["autoReferenced"] = "false",
             ["defineConstraints"] = "[]",
             ["versionDefines"] = "[]",
@@ -180,7 +182,7 @@ namespace CoveredLot.Core.Tests
         }
 
         [Fact]
-        public void The_client_asmdef_references_Core_and_no_precompiled_dll()
+        public void The_client_asmdef_references_Core_and_only_the_two_engine_dlls()
         {
             AssertAsmdefHolds(ClientAsmdef, ExpectedClientAsmdef);
         }

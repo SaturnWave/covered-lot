@@ -1,23 +1,29 @@
-using CoveredLot.Core;
+using System;
+using CoveredLot.Core.Catalogue;
+using CoveredLot.Core.Layout;
+using CoveredLot.Core.Navigation;
+using PuzzleCore;
 using UnityEngine;
 using UnityEngine.UIElements;
 
 namespace CoveredLot.Client
 {
     /// <summary>
-    /// The game's one MonoBehaviour and its composition root (design section 8.5). It sits on the Main scene's Game
-    /// object next to the UIDocument and finds that document itself, so it has no serialized reference fields. For now
-    /// it shows only the game's title; later pieces build the screens here.
+    /// The game's one MonoBehaviour and its composition root (design sections 6 and 8.5). It sits on the Main scene's Game
+    /// object next to the UIDocument and finds that document itself, so it has no serialized reference fields. In Awake it
+    /// loads the catalogue once, through ResourcesLevelTexts, makes the navigator, opens the Example when the catalogue is
+    /// ready (piece 13 starts on the level list instead), and builds the screens once. It keeps them in the document's
+    /// root, its safe-area padding current and the screen awake while a level is open (<see cref="DocumentScreens"/>).
     /// </summary>
     public sealed class GameRoot : MonoBehaviour
     {
-        /// <summary>The USS class of the title label; CoveredLot.uss gives it its size.</summary>
-        private const string TitleClass = "covered-lot-title";
+        /// <summary>The Example's index in the level list: the catalogue puts it first.</summary>
+        private const int ExampleIndex = 0;
 
-        /// <summary>
-        /// UIDocument runs at execution order -100 and creates its root element when it is enabled, so the root exists by
-        /// the time this Awake runs. Without panel settings that root is never attached to a panel, so nothing shows.
-        /// </summary>
+        /// <summary>The screens in the document; null when Awake found no UIDocument, and this component disabled itself.</summary>
+        private DocumentScreens? _screens;
+
+        /// <summary>UIDocument runs at execution order -100, so its root element exists by the time this Awake runs.</summary>
         private void Awake()
         {
             UIDocument? document = GetComponent<UIDocument>();
@@ -28,9 +34,150 @@ namespace CoveredLot.Client
                 return;
             }
 
-            var title = new Label(Copy.GameTitle);
-            title.AddToClassList(TitleClass);
-            document.rootVisualElement.Add(title);
+            _screens = new DocumentScreens(document, OpenedNavigator());
+        }
+
+        /// <summary>
+        /// When the Game object is activated, UIDocument, which runs first, has made a new root element; this puts the
+        /// screens into it at once, so no frame shows the new root empty.
+        /// </summary>
+        private void OnEnable()
+        {
+            if (_screens is not null)
+            {
+                _screens.KeepInDocument();
+            }
+        }
+
+        private void Update()
+        {
+            if (_screens is not null)
+            {
+                _screens.KeepInDocument();
+                _screens.KeepSafeAreaPadding();
+                _screens.KeepAwakeWhileALevelIsOpen();
+            }
+        }
+
+        /// <summary>No level shows while this component is disabled, so the screen may sleep as the device's settings say.</summary>
+        private void OnDisable()
+        {
+            if (_screens is not null)
+            {
+                _screens.LetSleep();
+            }
+        }
+
+        /// <summary>The navigator over the catalogue Resources holds, with the Example open. A catalogue that did not load shows the problem screen, where Open changes nothing.</summary>
+        private static Navigator OpenedNavigator()
+        {
+            var navigator = new Navigator(LevelCatalogue.Load(new ResourcesLevelTexts()));
+            navigator.Open(ExampleIndex);
+            return navigator;
+        }
+
+        /// <summary>
+        /// The screens, which this object keeps in its UIDocument, and the state of the device that follows them.
+        /// <list type="bullet">
+        /// <item><description>The screens live in a ScreenHost made once, not in the document: UIDocument makes a new root
+        /// element each time it is enabled, so the host is put back into the document's current root whenever it is not
+        /// there, and the same screens, with the same navigator and session, come back after the document is disabled and
+        /// enabled again.</description></item>
+        /// <item><description>The safe-area padding: the screen's size and safe area in pixels and the panel's size in
+        /// units, made whole and non-negative (<see cref="Whole"/>), give SafeInsets, which the host takes as its padding
+        /// whenever it differs from the padding it has.</description></item>
+        /// <item><description>The sleep timeout: NeverSleep while a level is open, and the device's own setting on any
+        /// other screen, set whenever it should change.</description></item>
+        /// </list>
+        /// </summary>
+        private sealed class DocumentScreens
+        {
+            private readonly UIDocument _document;
+            private readonly Navigator _navigator;
+            private readonly ScreenHost _host;
+
+            /// <summary>The padding the host has; None until the first padding is worked out.</summary>
+            private Option<SafeInsets> _padding;
+
+            /// <summary>The sleep timeout set last; None when it has not been set since this was made or since LetSleep.</summary>
+            private Option<int> _sleepTimeout;
+
+            public DocumentScreens(UIDocument document, Navigator navigator)
+            {
+                _document = document;
+                _navigator = navigator;
+                _host = new ScreenHost(navigator);
+            }
+
+            /// <summary>Puts the screens into the document's current root, unless they are there already; a disabled document has no root.</summary>
+            public void KeepInDocument()
+            {
+                VisualElement? root = _document.rootVisualElement;
+                if (root is not null && _host.parent != root)
+                {
+                    root.Add(_host);
+                }
+            }
+
+            public void KeepSafeAreaPadding()
+            {
+                IPanel? panel = _host.panel;
+                if (panel is null)
+                {
+                    return;
+                }
+
+                SafeInsets padding = SafeInsets.ToPanel(ScreenSize(), SafeArea(), PanelSizeOf(panel));
+                if (!_padding.TryGet(out SafeInsets current) || !SamePadding(current, padding))
+                {
+                    _host.Pad(padding);
+                    _padding = Option.Some(padding);
+                }
+            }
+
+            public void KeepAwakeWhileALevelIsOpen()
+            {
+                int wanted = _navigator.Screen is AppScreen.Playing ? SleepTimeout.NeverSleep : SleepTimeout.SystemSetting;
+                if (!_sleepTimeout.TryGet(out int current) || current != wanted)
+                {
+                    Screen.sleepTimeout = wanted;
+                    _sleepTimeout = Option.Some(wanted);
+                }
+            }
+
+            public void LetSleep()
+            {
+                Screen.sleepTimeout = SleepTimeout.SystemSetting;
+                _sleepTimeout = Option.None<int>();
+            }
+
+            private static PixelSize ScreenSize() =>
+                new PixelSize(new HorizontalPixels(Math.Max(0, Screen.width)), new VerticalPixels(Math.Max(0, Screen.height)));
+
+            /// <summary>
+            /// Screen.safeArea in whole pixels from the screen's bottom-left corner. Its left and bottom edges are rounded
+            /// up and its right and top edges down, so a fraction of a pixel never moves an edge into a cutout.
+            /// </summary>
+            private static PixelRect SafeArea()
+            {
+                Rect safe = Screen.safeArea;
+                int left = Whole.Ceiling(safe.xMin);
+                int bottom = Whole.Ceiling(safe.yMin);
+                int width = Math.Max(0, Whole.Floor(safe.xMax) - left);
+                int height = Math.Max(0, Whole.Floor(safe.yMax) - bottom);
+                return new PixelRect(new HorizontalPixels(left), new VerticalPixels(bottom), new PixelSize(new HorizontalPixels(width), new VerticalPixels(height)));
+            }
+
+            /// <summary>The panel's size in its own units, as its root's layout gives it: 360 units wide on every phone.</summary>
+            private static PanelSize PanelSizeOf(IPanel panel)
+            {
+                Rect layout = panel.visualTree.layout;
+                return new PanelSize(new HorizontalPanelUnits(Whole.Floor(layout.width)), new VerticalPanelUnits(Whole.Floor(layout.height)));
+            }
+
+            private static bool SamePadding(SafeInsets one, SafeInsets other) =>
+                one.Top.Value == other.Top.Value && one.Left.Value == other.Left.Value
+                && one.Bottom.Value == other.Bottom.Value && one.Right.Value == other.Right.Value;
         }
     }
 }

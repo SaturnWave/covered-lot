@@ -43,13 +43,14 @@ Unity CLI, `unity open .`, or with the editor itself: `<editor> -projectPath <re
   its own `csc.rsp`: warnings are errors and nullable is on, and Core also checks overflow.
   `Assets/Tests` holds the test assemblies (see Unity tests below), each with the same
   `csc.rsp` as the Client's.
-- `Assets/CoveredLot/UI/CoveredLot.uss` holds the look, and `Assets/CoveredLot/Scenes/Main.unity`
-  is the only scene. For now it shows the game's title.
+- `Assets/CoveredLot/UI/CoveredLot.uss` holds the whole look: every colour, font size, border
+  and spacing. `Assets/CoveredLot/Scenes/Main.unity` is the only scene. For now it opens the
+  Example, the rules board, on the play screen; the level list comes later.
 - The engine DLLs are imported with Auto Reference off, so only an assembly whose asmdef
   names them compiles against them. Their two `.meta` files were set once by hand, and
-  `tools/sync-engine.sh` never rewrites a `.meta` file. Core's asmdef names them; the
-  Client's and the Editor's name no DLL at all, so the game code also stays clear of the
-  package DLLs, such as NUnit, that Unity otherwise hands every assembly.
+  `tools/sync-engine.sh` never rewrites a `.meta` file. Core's and the Client's asmdefs name
+  them, and the Editor's names no DLL at all; none of the three takes the package DLLs, such
+  as NUnit, that Unity otherwise hands every assembly.
 
 A fresh clone has no `Library/`, so the first open imports the whole project, which takes
 several minutes. To import in batch mode, run this from the repository root in Git Bash,
@@ -158,6 +159,8 @@ check:
   first cell of the vehicle ahead on its path, as the engine's geometry gives them. The palette
   gives the colour ids 1 to 6 the six swatches with the letters R, B, Y, G, P and O, any other id
   throws, each swatch has a USS class of its own, and no two style names are the same;
+  `CoveredLot.uss` has a rule for each of the 43 classes the style names give, and names no
+  other `cl-` class;
 - the HUD and the end card (`HudPicture`, `EndPicture`) and their copy. On the Example the HUD
   reads `4 bays free` and `Most bays used: 0 (par 3)` at the start, over four empty bays, with
   the ledger `R 1`, `B 1`, `Y 0` and the row `1: not R`; after the taps 0 and 3 the ledger
@@ -239,8 +242,8 @@ picks the SDK, with `PUZZLE_TEST_CULTURE` set to `tr-TR` or `sv-SE`; without it 
 ## Unity tests
 
 `Assets/Tests` holds three assemblies that Unity builds only with the tests: `Support`, with
-`[HostileCulture]`, `TestCulture` and the culture guard that both test assemblies run, then
-`EditMode` and `PlayMode`. Every fixture runs under `[HostileCulture]`: before each test's
+`[HostileCulture]`, `TestCulture`, the culture guard that both test assemblies run and
+`ShownElements`, which reads what a screen shows, then `EditMode` and `PlayMode`. Every fixture runs under `[HostileCulture]`: before each test's
 set-up it applies the culture `PUZZLE_TEST_CULTURE` names, tr-TR or sv-SE, to the current, UI
 and default-thread cultures, and after the teardown it puts back each culture it found. When
 the variable is unset or names another culture, every test fails and names it. The EditMode
@@ -252,8 +255,8 @@ tests check:
   no-break-space digit groups);
 - `[HostileCulture]` itself, driven on a fresh instance: it applies the culture to all four
   and puts back each of the four it found;
-- Core's level catalogue and play session inside Unity: fed the texts Resources holds by a
-  test-only host, the catalogue loads the Example first with par 3, then the 98 levels
+- Core's level catalogue and play session inside Unity: fed the texts Resources holds by the
+  Client's host, `ResourcesLevelTexts`, the catalogue loads the Example first with par 3, then the 98 levels
   `presentation.json` lists as Level 1 to 98, each with the slot and par that file gives; each
   level it loaded writes back to its asset text, and each listed level has its presentation
   fingerprint; a level text that Resources lacks gives its development line; and on the
@@ -269,10 +272,38 @@ tests check:
   ARM64 only, API level 25 (Unity reads a lower saved level as 25, so the .NET checks pin the
   saved value), the Game category, .NET Standard 2.1, minimal stripping, editor 6000.3.29f1,
   and Main as the only scene in the build;
-- that every fixture of the test assemblies carries `[HostileCulture]`.
+- that every fixture of the test assemblies carries `[HostileCulture]`;
+- the play screen, clicked as a player clicks it, in a panel of the UI Test Framework that no
+  window shows, 360 x 800 units with the game's own theme (Unity's default runtime theme, then
+  `CoveredLot.uss`), over the catalogue `ResourcesLevelTexts` loads, with the Example open:
+  clicking tile 5 outlines tile 4 alone and the status reads `Something is in its way.` until
+  the next tap; the winning line shows the win card with `Cleared!`, `3 stars` and `Most bays
+  used: 3 (par 3)`, and Play again, Next level and Levels; the taps 0,3,1,8 show the fail card,
+  `All bays are full.` with Retry and Levels, over the lot, so a click at the centre of each
+  of the 5 tiles left reaches the card; Retry then shows nine tiles, tile 3 covered as `?v`,
+  the ledger `R 1`, `B 1`, `Y 0`, no blocker outline and no card; a bump followed by Restart
+  leaves no blocker outline and an empty status line; after the taps 0 and 3 the ghosts of 0
+  and 3 show, the ghost of 3 reading `Bv` with badge 1, and the tags list keeps its row `1`,
+  `not R`; an entry made from the variant text tagged `Not(3,R);Not(3,Y);Ahead(7,Same);Touch(7,Y,2)`
+  shows one link, from cell 27 to cell 24, and draws its arrow; in play and with each card,
+  every button shown is at least 48 x 48 units and every label at least 14, a badge 12, with the
+  counts of buttons and labels pinned; and the title, the status line, the HUD's lines, the
+  headings, the pills and the tags show the ink of `CoveredLot.uss`, not a colour of the default
+  theme;
+- how the Client makes Unity's floats whole and non-negative (`Whole`): rounded down or up, and
+  0 for a NaN, a negative value or zero.
 
-The PlayMode tests run the culture guard, and load the Main scene by name: its Game object's
-UIDocument is then attached to a panel and holds one label, the game's title.
+The PlayMode tests run the culture guard, and load the Main scene by name. Its Game object's
+UIDocument is then attached to a panel and shows the play screen of the Example alone, titled
+`Example`. Clicked through the UI Test Framework on that document, the winning line shows the
+win card, and Play again brings the covers of vehicles 3 and 7 back on all nine tiles. After
+the taps 0 and 3, the document disabled and enabled again makes a new root element, and the
+play screen comes back in it with the same session: the status `Cover lifted: blue.`, seven
+tiles, and the ghosts of 0 and 3. The editor's batch-mode screen is 640 x 480 pixels, a panel
+of 360 x 270 units with the game's panel settings, which are matched on the width, and a
+runtime panel drops a click below its bottom edge; so these click tests give the document a
+copy of its panel settings matched on the height, a panel 800 units high, and give it its own
+back afterwards.
 
 To run one mode by hand, with the editor closed:
 

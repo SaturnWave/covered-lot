@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using CoveredLot.Client;
 using CoveredLot.Core;
 using CoveredLot.Core.Catalogue;
 using CoveredLot.Core.Session;
@@ -17,8 +18,9 @@ namespace CoveredLot.Tests.EditMode
 {
     /// <summary>
     /// Core's level catalogue and play session inside Unity's runtime (design section 10.3), under the culture the run
-    /// names, as the .NET tests check them on .NET. A test-only host gives LevelCatalogue.Load the texts that Resources
-    /// holds, each loaded as a TextAsset by its Resources path and unloaded after reading, and the catalogue gives Ready:
+    /// names, as the .NET tests check them on .NET. The Client's host, ResourcesLevelTexts, gives LevelCatalogue.Load the
+    /// texts that Resources holds, each loaded as a TextAsset by its Resources path and unloaded after reading, as the game
+    /// loads them, and the catalogue gives Ready:
     /// the Example first with par 3, then Level 1 to 98 in the order presentation.json lists them, each with the slot and
     /// the par that file gives. Each level it loaded writes back to its asset's text, and each listed level has its
     /// presentation fingerprint. A level text that Resources lacks gives Broken with Copy's development line for it. On the
@@ -51,7 +53,7 @@ namespace CoveredLot.Tests.EditMode
         {
             IReadOnlyList<PresentationLevel> listed = ListedLevels();
 
-            IReadOnlyList<CatalogueEntry> entries = EntriesOf(LevelCatalogue.Load(new ResourcesTexts()));
+            IReadOnlyList<CatalogueEntry> entries = EntriesOf(LevelCatalogue.Load(new ResourcesLevelTexts()));
 
             var expected = new List<string> { "Example, no slot, par " + Number(ExamplePeakPar) };
             for (int position = 0; position < listed.Count; position++)
@@ -69,7 +71,7 @@ namespace CoveredLot.Tests.EditMode
         {
             IReadOnlyList<string> assets = new[] { ExampleAsset }.Concat(ListedLevels().Select(level => level.Level.Value)).ToList();
 
-            IReadOnlyList<CatalogueEntry> entries = EntriesOf(LevelCatalogue.Load(new ResourcesTexts()));
+            IReadOnlyList<CatalogueEntry> entries = EntriesOf(LevelCatalogue.Load(new ResourcesLevelTexts()));
 
             Assert.That(entries.Count, Is.EqualTo(ListedLevelCount + 1), "the catalogue's entries: the Example and the listed levels");
             Assert.That(assets.Count, Is.EqualTo(entries.Count), "the asset texts to compare");
@@ -90,7 +92,7 @@ namespace CoveredLot.Tests.EditMode
         {
             IReadOnlyList<PresentationLevel> listed = ListedLevels();
 
-            IReadOnlyList<CatalogueEntry> entries = EntriesOf(LevelCatalogue.Load(new ResourcesTexts()));
+            IReadOnlyList<CatalogueEntry> entries = EntriesOf(LevelCatalogue.Load(new ResourcesLevelTexts()));
 
             Assert.That(listed.Count, Is.EqualTo(ListedLevelCount), "the levels presentation.json lists");
             Assert.That(entries.Count, Is.EqualTo(listed.Count + 1), "the catalogue's entries: the Example and the listed levels");
@@ -303,7 +305,7 @@ namespace CoveredLot.Tests.EditMode
         /// <summary>The catalogue's first entry, which must be the Example.</summary>
         private static CatalogueEntry ExampleEntry()
         {
-            CatalogueEntry first = EntriesOf(LevelCatalogue.Load(new ResourcesTexts()))[0];
+            CatalogueEntry first = EntriesOf(LevelCatalogue.Load(new ResourcesLevelTexts()))[0];
             Assert.That(first.Title, Is.InstanceOf<EntryTitle.Example>(), "the title of the catalogue's first entry");
             return first;
         }
@@ -354,36 +356,10 @@ namespace CoveredLot.Tests.EditMode
             return bays;
         }
 
-        /// <summary>
-        /// The level texts as Unity's Resources hold them, a test-only host such as the Client's will be (piece 11): each text
-        /// is loaded as a TextAsset by its Resources path, a missing asset gives None, and the asset is unloaded once its text
-        /// is read.
-        /// </summary>
-        private sealed class ResourcesTexts : ILevelTexts
-        {
-            public Option<string> Read(LevelTextName name)
-            {
-                TextAsset? asset = Resources.Load<TextAsset>(name.ResourcesPath);
-                if (asset == null)
-                {
-                    return Option.None<string>();
-                }
-
-                try
-                {
-                    return Option.Some(asset.text);
-                }
-                finally
-                {
-                    Resources.UnloadAsset(asset);
-                }
-            }
-        }
-
         /// <summary>The texts Resources holds, but for the one level's, which this host lacks.</summary>
         private sealed class ResourcesTextsWithout : ILevelTexts
         {
-            private readonly ILevelTexts _texts = new ResourcesTexts();
+            private readonly ILevelTexts _texts = new ResourcesLevelTexts();
             private readonly LevelId _lacking;
 
             public ResourcesTextsWithout(LevelId lacking) => _lacking = lacking;

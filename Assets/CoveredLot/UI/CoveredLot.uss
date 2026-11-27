@@ -1,16 +1,444 @@
 /*
- * Covered Lot's look (design sections 6 and 9). Every colour and size of the screens lives in this file, so the
- * designs restyle the game here; the code only adds class names. The colours are a placeholder until the designs
- * arrive. ProjectSetup clears the camera to the same page colour, so no other colour shows before the panel draws.
+ * Covered Lot's look (design sections 6 and 9). Every colour, font size, border and spacing of the screens lives in this
+ * file, so the designs restyle the game here; the code only adds the class names of Core's StyleNames, and sets the
+ * positions and sizes the board's geometry gives, the safe area's padding, what is displayed and what takes pointer
+ * events. The colours are a placeholder until the designs arrive. ProjectSetup clears the camera to the same page colour,
+ * so no other colour shows before the panel draws.
+ *
+ * Sizes are in panel units: the panel is 360 units wide, so on a 360dp-wide phone a unit is about one dp. Body text is
+ * 16, small text 14 and badge numbers 12, and every button is at least 48 x 48 (design section 6).
  */
 
-/* The panel's root: the page background, and the text colour its elements inherit unless a rule sets their own. */
+/* The panel's root: the palette, the page background, and the text colour its elements inherit. */
 :root {
-  background-color: #F4F1EA;
-  color: #1D1D1D;
+  --cl-page: #F4F1EA;
+  --cl-ink: #1D1D1D;
+  --cl-light-ink: #FFFFFF;
+  --cl-outline: #C8C2B4;
+  --cl-button: #E2DCCF;
+  --cl-button-pressed: #CFC8B8;
+  --cl-lot: #3A3D42;
+  --cl-cell: #4B4F56;
+  --cl-pillar: #6B5A3A;
+  --cl-covered: #8A8F98;
+  --cl-blocker: #FFD400;
+  --cl-link: #FFFFFF;
+  --cl-badge: #1D1D1D;
+  --cl-red: #D55E00;
+  --cl-blue: #0072B2;
+  --cl-yellow: #F0E442;
+  --cl-green: #009E73;
+  --cl-pink: #CC79A7;
+  --cl-orange: #E69F00;
+  background-color: var(--cl-page);
+  color: var(--cl-ink);
 }
 
-/* The game's title, in body text: 16 panel units, about 16dp on a 360dp-wide phone (design section 6). */
-.covered-lot-title {
+/* The screens and the play screen fill the panel inside the safe area's padding, which the code sets on .cl-screen. */
+.cl-screen {
+  flex-grow: 1;
+}
+
+.cl-play {
+  flex-grow: 1;
+}
+
+.cl-play-area {
+  flex-grow: 1;
+}
+
+/* The top bar: Levels on the left, the title in the middle, Restart on the right. */
+.cl-top-bar {
+  flex-direction: row;
+  align-items: center;
+  padding: 4px;
+}
+
+.cl-title {
+  flex-grow: 1;
   font-size: 16px;
+  -unity-font-style: bold;
+  -unity-text-align: middle-center;
+  color: var(--cl-ink);
+}
+
+/* Every button, at least 48 x 48 units (Android's 48dp touch guidance). */
+.cl-button {
+  min-width: 48px;
+  min-height: 48px;
+  margin: 4px;
+  padding: 0 12px;
+  font-size: 16px;
+  -unity-text-align: middle-center;
+  color: var(--cl-ink);
+  background-color: var(--cl-button);
+  border-width: 0;
+  border-radius: 8px;
+}
+
+.cl-button:hover {
+  background-color: var(--cl-button);
+}
+
+.cl-button:active {
+  background-color: var(--cl-button-pressed);
+}
+
+.cl-status {
+  min-height: 24px;
+  margin: 2px 8px;
+  font-size: 16px;
+  -unity-text-align: middle-center;
+  color: var(--cl-ink);
+}
+
+/* The lot's frame: 8-unit side margins leave 344 units across. It has no padding and no border, so the geometry's
+   units count from its top-left corner. */
+.cl-lot-frame {
+  flex-grow: 1;
+  margin: 4px 8px;
+}
+
+.cl-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+}
+
+/* The lot: a dark rectangle of square cells with 2-unit gaps; empty cells slightly lighter. */
+.cl-lot {
+  position: absolute;
+  background-color: var(--cl-lot);
+  border-radius: 4px;
+}
+
+.cl-cell {
+  position: absolute;
+  background-color: var(--cl-cell);
+  border-radius: 2px;
+}
+
+.cl-cell.cl-pillar {
+  background-color: var(--cl-pillar);
+}
+
+.cl-glyph {
+  flex-grow: 1;
+  margin: 0;
+  padding: 0;
+  font-size: 16px;
+  -unity-text-align: middle-center;
+  color: var(--cl-page);
+}
+
+/* A vehicle's box; the tile or ghost inside it is inset 3 units from its edges. */
+.cl-slot {
+  position: absolute;
+  padding: 3px;
+}
+
+/* A tile: a rounded rectangle in its swatch, or grey while it is shown covered. */
+.cl-tile {
+  flex-grow: 1;
+  border-radius: 6px;
+  background-color: var(--cl-covered);
+}
+
+.cl-tile.cl-covered {
+  background-color: var(--cl-covered);
+}
+
+.cl-tile.cl-swatch-red {
+  background-color: var(--cl-red);
+}
+
+.cl-tile.cl-swatch-blue {
+  background-color: var(--cl-blue);
+}
+
+.cl-tile.cl-swatch-yellow {
+  background-color: var(--cl-yellow);
+}
+
+.cl-tile.cl-swatch-green {
+  background-color: var(--cl-green);
+}
+
+.cl-tile.cl-swatch-pink {
+  background-color: var(--cl-pink);
+}
+
+.cl-tile.cl-swatch-orange {
+  background-color: var(--cl-orange);
+}
+
+/* What the last tap bumped into: a 3-unit outline until the next tap, retry or level open. */
+.cl-blocker {
+  border-width: 3px;
+  border-color: var(--cl-blocker);
+}
+
+/* A tile's or a ghost's label: white, and dark ink on the light swatches yellow, pink and orange. */
+.cl-tile-label {
+  flex-grow: 1;
+  margin: 0;
+  padding: 0;
+  font-size: 16px;
+  -unity-text-align: middle-center;
+  color: var(--cl-light-ink);
+}
+
+.cl-tile.cl-swatch-yellow > .cl-tile-label,
+.cl-tile.cl-swatch-pink > .cl-tile-label,
+.cl-tile.cl-swatch-orange > .cl-tile-label {
+  color: var(--cl-ink);
+}
+
+/* A ghost: a 1-unit outline in its swatch, at low opacity, with its true label. */
+.cl-ghost {
+  flex-grow: 1;
+  border-width: 1px;
+  border-radius: 6px;
+  border-color: var(--cl-outline);
+  opacity: 0.5;
+}
+
+.cl-ghost.cl-swatch-red {
+  border-color: var(--cl-red);
+}
+
+.cl-ghost.cl-swatch-blue {
+  border-color: var(--cl-blue);
+}
+
+.cl-ghost.cl-swatch-yellow {
+  border-color: var(--cl-yellow);
+}
+
+.cl-ghost.cl-swatch-green {
+  border-color: var(--cl-green);
+}
+
+.cl-ghost.cl-swatch-pink {
+  border-color: var(--cl-pink);
+}
+
+.cl-ghost.cl-swatch-orange {
+  border-color: var(--cl-orange);
+}
+
+/* A badge: a small number, in the top-left corner of a tile or a ghost, and first in a row of the tags list. */
+.cl-badge {
+  min-width: 16px;
+  margin: 0;
+  padding: 0 4px;
+  font-size: 12px;
+  -unity-text-align: middle-center;
+  color: var(--cl-light-ink);
+  background-color: var(--cl-badge);
+  border-radius: 6px;
+}
+
+.cl-tile > .cl-badge,
+.cl-ghost > .cl-badge {
+  position: absolute;
+  left: 2px;
+  top: 2px;
+}
+
+/* The Ahead links: the lines and arrowheads take the layer's text colour; the two custom properties are in panel units. */
+.cl-ahead-links {
+  color: var(--cl-link);
+  --cl-link-width: 2;
+  --cl-arrow-size: 8;
+}
+
+/* The bays row: 40-unit boxes, slot 0 on the left; an empty bay is a light outline, a filled one its swatch. */
+.cl-bays {
+  flex-direction: row;
+  justify-content: center;
+  margin: 4px 8px;
+}
+
+.cl-bay {
+  width: 40px;
+  height: 40px;
+  margin: 0 3px;
+  border-width: 2px;
+  border-radius: 6px;
+  border-color: var(--cl-outline);
+}
+
+.cl-bay.cl-swatch-red {
+  background-color: var(--cl-red);
+  border-color: var(--cl-red);
+}
+
+.cl-bay.cl-swatch-blue {
+  background-color: var(--cl-blue);
+  border-color: var(--cl-blue);
+}
+
+.cl-bay.cl-swatch-yellow {
+  background-color: var(--cl-yellow);
+  border-color: var(--cl-yellow);
+}
+
+.cl-bay.cl-swatch-green {
+  background-color: var(--cl-green);
+  border-color: var(--cl-green);
+}
+
+.cl-bay.cl-swatch-pink {
+  background-color: var(--cl-pink);
+  border-color: var(--cl-pink);
+}
+
+.cl-bay.cl-swatch-orange {
+  background-color: var(--cl-orange);
+  border-color: var(--cl-orange);
+}
+
+.cl-bay-letter {
+  flex-grow: 1;
+  margin: 0;
+  padding: 0;
+  font-size: 16px;
+  -unity-text-align: middle-center;
+  color: var(--cl-light-ink);
+}
+
+.cl-bay.cl-swatch-yellow > .cl-bay-letter,
+.cl-bay.cl-swatch-pink > .cl-bay-letter,
+.cl-bay.cl-swatch-orange > .cl-bay-letter {
+  color: var(--cl-ink);
+}
+
+/* The lines under the bays: "4 bays free" and "Most bays used: 0 (par 3)", in small text. */
+.cl-hud-line {
+  margin: 0 8px;
+  font-size: 14px;
+  -unity-text-align: middle-center;
+  color: var(--cl-ink);
+}
+
+/* The ledger: "Still covered:" and a pill for each colour, its border in the colour's swatch. */
+.cl-ledger {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  margin: 4px 8px 0 8px;
+}
+
+.cl-heading {
+  margin: 0 4px;
+  font-size: 14px;
+  -unity-font-style: bold;
+  color: var(--cl-ink);
+}
+
+.cl-pill {
+  margin: 2px 3px;
+  padding: 2px 8px;
+  font-size: 14px;
+  color: var(--cl-ink);
+  border-width: 2px;
+  border-radius: 12px;
+  border-color: var(--cl-outline);
+}
+
+.cl-pill.cl-swatch-red {
+  border-color: var(--cl-red);
+}
+
+.cl-pill.cl-swatch-blue {
+  border-color: var(--cl-blue);
+}
+
+.cl-pill.cl-swatch-yellow {
+  border-color: var(--cl-yellow);
+}
+
+.cl-pill.cl-swatch-green {
+  border-color: var(--cl-green);
+}
+
+.cl-pill.cl-swatch-pink {
+  border-color: var(--cl-pink);
+}
+
+.cl-pill.cl-swatch-orange {
+  border-color: var(--cl-orange);
+}
+
+/* The tags list: "Tags:" and one row per tagged vehicle, its badge, then its tags. */
+.cl-tags {
+  margin: 4px 8px;
+}
+
+.cl-tag-row {
+  flex-direction: row;
+  align-items: center;
+  margin: 2px 4px;
+}
+
+.cl-tag-line {
+  margin: 0 4px;
+  font-size: 14px;
+  color: var(--cl-ink);
+}
+
+/* An end card: opaque over the play area, so the lot under it takes no tap. */
+.cl-card {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--cl-page);
+}
+
+.cl-card-heading {
+  margin: 0 16px 8px 16px;
+  font-size: 16px;
+  -unity-font-style: bold;
+  -unity-text-align: middle-center;
+  color: var(--cl-ink);
+}
+
+.cl-card-line {
+  margin: 0 16px 4px 16px;
+  font-size: 16px;
+  -unity-text-align: middle-center;
+  color: var(--cl-ink);
+}
+
+.cl-card > .cl-button {
+  min-width: 180px;
+  margin-top: 8px;
+}
+
+/* The level list and the problem screen, until piece 13 brings their own: centred on the page. */
+.cl-level-list {
+  flex-grow: 1;
+  align-items: center;
+  justify-content: center;
+}
+
+.cl-problems {
+  flex-grow: 1;
+  align-items: center;
+  justify-content: center;
+}
+
+.cl-message {
+  margin: 0 16px;
+  font-size: 16px;
+  -unity-text-align: middle-center;
+  color: var(--cl-ink);
 }
