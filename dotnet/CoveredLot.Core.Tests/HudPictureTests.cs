@@ -19,12 +19,12 @@ namespace CoveredLot.Core.Tests
     /// 8.3 and 9): the known answers of the HUD's lines, bays, ledger, tags list and status. At the start it reads "4 bays
     /// free" and "Most bays used: 0 (par 3)" over four empty bays, the ledger R 1, B 1, Y 0 and the row "1: not R". After
     /// the taps 0 and 3 the ledger reads R 1, B 0, Y 0 and the status "Cover lifted: blue."; after 0, 3 and 4, "Three blue
-    /// cleared."; after 0, 3 and 1 the bays hold B, B, R and an empty one, with "1 bay free". A bump reads "Something is in
-    /// its way." and changes nothing else, and the next tap's status replaces it. Along the winning line the status names
-    /// each lifted cover and cleared set, red and yellow included, joined by a space when one tap does both; on the Example
-    /// with its blue vehicles made green, pink or orange it names those colours. Level 1, which has no covers, shows no
-    /// ledger and no tags list, under its title "Level 1". The tests run under tr-TR and under sv-SE, and the lines are the
-    /// same under both.
+    /// cleared."; after 0, 3 and 1 the bays hold B, B, R and an empty one, with "1 bay free"; and after 0, 3, 1 and 8, which
+    /// fail, they hold B, B, R and Y, with "0 bays free". A bump reads "Something is in its way." and changes nothing else,
+    /// and the next tap's status replaces it. Along the winning line the status names each lifted cover and cleared set,
+    /// red and yellow included, joined by a space when one tap does both; on the Example with its blue vehicles made green,
+    /// pink or orange it names those colours. Level 1, which has no covers, shows no ledger and no tags list, under its
+    /// title "Level 1". The tests run under tr-TR and under sv-SE, and the lines are the same under both.
     /// </summary>
     public sealed class HudPictureTests
     {
@@ -87,6 +87,21 @@ namespace CoveredLot.Core.Tests
             Assert.Equal("1 bay free", hud.BaysFreeLine);
             Assert.Equal("Most bays used: 3 (par 3)", hud.PeakLine);
             Assert.Equal(string.Empty, hud.StatusLine);
+        }
+
+        /// <summary>The fail with every bay full is the one state with no bay free, and the HUD is still shown beside the fail card.</summary>
+        [Fact]
+        public void After_the_taps_0_3_1_and_8_the_bays_hold_B_B_R_Y_and_0_bays_are_free()
+        {
+            var session = new GameSession(ShippedCatalogue.Example());
+
+            IReadOnlyList<string> notMoved = TapAll(session, 0, 3, 1, 8);
+            HudPicture hud = HudPicture.Of(session);
+
+            Assert.Empty(notMoved);
+            Assert.Equal(new[] { "B Blue", "B Blue", "R Red", "Y Yellow" }, hud.Bays.Select(Bay));
+            Assert.Equal("0 bays free", hud.BaysFreeLine);
+            Assert.Equal("Most bays used: 4 (par 3)", hud.PeakLine);
         }
 
         /// <summary>A bump changes nothing but the status; the next tap, here an ignored one on an id the Example lacks, empties it.</summary>

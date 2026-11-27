@@ -177,6 +177,22 @@ check:
   block, in any letter case); in the seeded runs, after every tap, the HUD's bays also hold
   what the state's bays hold, its ledger counts the vehicles the engine's rules call covered,
   and each tile lies over exactly its vehicle's footprint;
+- the screen flow, the board's geometry, the safe area and the development line
+  (`Navigator`, `BoardGeometry`, `SafeInsets`, `DevFacts`). A catalogue that loads starts on
+  the level list, and a broken one on the problem screen, which no action leaves; `Open` plays
+  the entry at its index with a new session, and an index outside the list changes nothing;
+  `Next` from the Example plays Level 1, and after the last entry it is None and changes
+  nothing; `Again` plays the level once more with a fresh session, at peak 0 with its covers
+  back; and `BackToList` shows the list again. For each of the 16 lot sizes, 5x5 to 8x8, in a
+  phone's frame of 344x420 units, a short one of 344x300 and a wide one of 760x600, the cells
+  are square, 2 units apart and the largest that fit, the board is centred in the frame, and
+  each tile's rectangle spans exactly its vehicle's cells; in the phone frame the square lots
+  get cells of 67, 55, 47 and 41 units. On a 1080x2400 screen a safe area 63 pixels up and
+  2247 high pads the 360x800 panel 30 units at the top and 21 at the bottom, part of a unit
+  takes the whole unit, and a safe area past the screen's edge, or a screen with no pixels,
+  pads nothing. In Level 25 the development line reads, exactly, `slot 0024 | par 4 | tr-TR |
+  1080x2400 | safe 0 63 1080 2247 | cell 47`, and the culture button cycles the device's
+  culture, tr-TR and sv-SE;
 - the closed sets Core switches over or makes, now or in the pieces to come, pinned case by
   case: the values of the engine's `LotTextProblem`, `LoadProblem`, `FailKind`,
   `InvalidReason`, `Facing` and `AheadRelation`, the cases of its `LotTextResult`,

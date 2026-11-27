@@ -10,8 +10,9 @@ namespace CoveredLot.Core.Tests
 {
     /// <summary>
     /// The palette and the style names (design section 8.1): the colour ids 1 to 6 give the six swatches in order, with the
-    /// letters R, B, Y, G, P and O; every other colour id throws ArgumentOutOfRangeException; each swatch has a class of its
-    /// own, and every style name is a USS class name that no other one shares.
+    /// letters R, B, Y, G, P and O; every other colour id, the default one (0) too, throws ArgumentOutOfRangeException from
+    /// the palette itself; each swatch has a class of its own, and every style name is a USS class name that no other one
+    /// shares.
     /// </summary>
     public sealed class PaletteTests
     {
@@ -46,6 +47,19 @@ namespace CoveredLot.Core.Tests
             }
 
             Assert.Equal(Enumerable.Range(7, 9), tried);
+        }
+
+        /// <summary>
+        /// default(ColourId) skips the engine's constructor and has the value 0, which names no colour. The palette refuses it
+        /// itself, naming the colour, where an unguarded letter would fail inside string.Substring instead.
+        /// </summary>
+        [Fact]
+        public void The_default_colour_id_is_refused_by_the_palette_itself_for_its_swatch_and_for_its_letter()
+        {
+            ColourId zero = default;
+
+            Assert.Equal("colour", Assert.Throws<ArgumentOutOfRangeException>(() => Palette.SwatchOf(zero)).ParamName);
+            Assert.Equal("colour", Assert.Throws<ArgumentOutOfRangeException>(() => Palette.LetterOf(zero)).ParamName);
         }
 
         [Fact]

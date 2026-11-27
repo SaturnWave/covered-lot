@@ -1,4 +1,3 @@
-using System;
 using System.Globalization;
 using CoveredLot.Core.Pictures;
 using PuzzleCore;
@@ -62,12 +61,12 @@ namespace CoveredLot.Core.Tests.Support
         /// <summary>"(row,column)": "(0,4)".</summary>
         public static string Cell(GridCell cell) => "(" + Number(cell.Row.Value) + "," + Number(cell.Column.Value) + ")";
 
-        /// <summary>"Open(Blue, B)", or "Covered".</summary>
+        /// <summary>"Open(Blue, B)", or "Covered". A kind of face the tests do not know is described by its type, so a comparison fails on it without a throw.</summary>
         public static string Face(TileFace face) => face switch
         {
             TileFace.Open open => "Open(" + open.Swatch.ToString() + ", " + open.Letter + ")",
             TileFace.Covered => "Covered",
-            _ => throw new ArgumentOutOfRangeException(nameof(face), "No description for " + face.GetType().Name + "."),
+            _ => "an unknown kind of face, " + face.GetType().Name,
         };
 
         /// <summary>"badge 1", or "no badge".</summary>

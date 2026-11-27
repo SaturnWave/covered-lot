@@ -31,7 +31,8 @@ namespace CoveredLot.Core.Pictures
         /// <exception cref="ArgumentOutOfRangeException">The colour id is not 1 to 6.</exception>
         public static string LetterOf(ColourId colour)
         {
-            if (colour.Value > ColourCount)
+            // default(ColourId) skips the engine's constructor and has the value 0, which names no colour.
+            if (colour.Value < ColourId.MinValue || colour.Value > ColourCount)
             {
                 throw new ArgumentOutOfRangeException(nameof(colour), "The palette has letters for the colour ids 1 to 6 only.");
             }

@@ -250,9 +250,9 @@ namespace CoveredLot.Core.Tests
                 HudPicture hud = HudPicture.Of(_session);
                 _tally.PictureChecks++;
                 _tally.Tiles += board.Tiles.Count;
-                Compare(tap + ": the bays", hud.Bays.Select(Bay).ToList(), ExpectedBays());
-                Compare(tap + ": the ledger", hud.Ledger.Select(Pill).ToList(), ExpectedLedger());
-                Compare(tap + ": the tiles", TilesOf(board), ExpectedTiles());
+                Compare(tap + ": the bays", hud.Bays.Select(Bay).ToList(), ExpectedBays);
+                Compare(tap + ": the ledger", hud.Ledger.Select(Pill).ToList(), ExpectedLedger);
+                Compare(tap + ": the tiles", TilesOf(board), ExpectedTiles);
                 foreach (string line in PictureStrings.Of(board, hud, EndPicture.Of(_session)))
                 {
                     _tally.Strings++;
@@ -348,8 +348,13 @@ namespace CoveredLot.Core.Tests
                 return tiles;
             }
 
-            private void Compare(string what, IReadOnlyList<string> pictured, IReadOnlyList<string> expected)
+            /// <summary>
+            /// Adds a disagreement to the tally when the picture's lines differ from the engine's. The engine's lines are worked
+            /// out here, by the method given, so a call cannot put the picture's lines in their place.
+            /// </summary>
+            private void Compare(string what, IReadOnlyList<string> pictured, Func<IReadOnlyList<string>> engine)
             {
+                IReadOnlyList<string> expected = engine();
                 if (!pictured.SequenceEqual(expected, StringComparer.Ordinal))
                 {
                     _tally.Wrong.Add(what + " are [" + string.Join("; ", pictured) + "], the engine gives [" + string.Join("; ", expected) + "]");
