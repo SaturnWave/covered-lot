@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -15,8 +16,9 @@ namespace CoveredLot.Core.Tests
     /// <summary>
     /// GameSession on every level presentation.json lists, as the catalogue loads it from the shipped texts (design section
     /// 10.1). The engine's par search, with the level's own bays and 200,000 nodes, finds the peakPar the file gives, and
-    /// the winning order it finds, tapped through a new session, wins with three stars. Seeded runs of taps on any of a
-    /// level's vehicles, blocked ones and ones that have left included, then check what the session works out itself
+    /// the winning order it finds, tapped through a new session, wins at the peak the search found, for three stars.
+    /// Seeded runs of taps on any of a level's vehicles, blocked ones and ones that have left included, then check what
+    /// the session works out itself
     /// against the engine: after every tap the peak equals LotSolver.PeakOf over the exits played, each bump names the
     /// first blocker the level gives for the vehicles still in the lot before the tap, each ignored tap was on a vehicle
     /// that had left the lot and says so (NotInLot), and no win has a peak below the par. Every count is asserted, so no
@@ -31,6 +33,9 @@ namespace CoveredLot.Core.Tests
 
         /// <summary>A run ends when the level is over, or after this many taps for each of the level's vehicles.</summary>
         private const int TapsPerVehicle = 3;
+
+        /// <summary>How many of the seeded runs' disagreements a failure lists; it gives their count as well.</summary>
+        private const int ShownDisagreements = 20;
 
         [Fact]
         public void The_par_search_with_each_level_s_own_bays_and_200000_nodes_finds_the_peakPar_its_file_gives()
@@ -53,7 +58,7 @@ namespace CoveredLot.Core.Tests
         }
 
         [Fact]
-        public void The_winning_order_the_par_search_finds_wins_each_level_through_a_session_with_three_stars()
+        public void The_winning_order_the_par_search_finds_wins_each_level_through_a_session_at_the_search_s_peak_with_three_stars()
         {
             IReadOnlyList<ListedLevel> levels = ShippedCatalogue.Listed();
 
@@ -78,18 +83,21 @@ namespace CoveredLot.Core.Tests
                     }
                 }
 
+                // The search's order wins at the least peak, which the par-search test pins to the file's peakPar, so a
+                // session whose peak is one too low fails here as well as in the seeded runs.
                 StarRating stars = Stars.For(session.Peak, level.Entry.PeakPar);
-                if (!(session.Outcome is Outcome.Won) || stars != StarRating.Three)
+                if (!(session.Outcome is Outcome.Won) || session.Peak.Bays.Value != found.Peak.Value || stars != StarRating.Three)
                 {
                     wrong.Add(level.Name + ": the order ends " + session.Outcome.GetType().Name + " with peak " + Number(session.Peak.Bays.Value)
-                        + " on par " + Number(level.Entry.PeakPar.Bays.Value) + ", " + stars.ToString() + " stars");
+                        + " where the search found " + Number(found.Peak.Value) + ", on par " + Number(level.Entry.PeakPar.Bays.Value)
+                        + ", " + stars.ToString() + " stars");
                 }
             }
 
             // Every vehicle leaves once in a winning order, so the orders tap each vehicle of each level once.
             Assert.Equal(ShippedCatalogue.ListedLevelCount, levels.Count);
             Assert.Equal(levels.Sum(level => level.Entry.Level.VehicleCount), taps);
-            Assert.True(wrong.Count == 0, "These winning orders do not win with three stars through a session:\n" + string.Join("\n", wrong));
+            Assert.True(wrong.Count == 0, "These winning orders do not win at the search's peak with three stars through a session:\n" + string.Join("\n", wrong));
         }
 
         [Fact]
@@ -114,7 +122,8 @@ namespace CoveredLot.Core.Tests
             Assert.True(tally.Moves > 0 && tally.Ignored > 0, "The runs moved " + Number(tally.Moves) + " and ignored " + Number(tally.Ignored) + " taps.");
             Assert.True(tally.Bumps > 0, "No tap of the runs bumped, so no blocker was checked.");
             Assert.True(tally.Wins > 0 && tally.Fails > 0, "The runs won " + Number(tally.Wins) + " and failed " + Number(tally.Fails) + " levels.");
-            Assert.True(tally.Wrong.Count == 0, "The session disagrees with the engine:\n" + string.Join("\n", tally.Wrong));
+            Assert.True(tally.Wrong.Count == 0, "The session disagrees with the engine " + Number(tally.Wrong.Count) + " times; the first "
+                + Number(Math.Min(ShownDisagreements, tally.Wrong.Count)) + ":\n" + string.Join("\n", tally.Wrong.Take(ShownDisagreements)));
         }
 
         private static PeakParResult ParSearch(ListedLevel level) =>

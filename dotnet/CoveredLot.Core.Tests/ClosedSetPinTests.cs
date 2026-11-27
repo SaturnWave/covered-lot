@@ -197,27 +197,28 @@ namespace CoveredLot.Core.Tests
         private static void AssertGenericEngineCases(Type closedSet, params string[] cases)
         {
             Type definition = closedSet.GetGenericTypeDefinition();
-            IReadOnlyList<Type> derived = definition.Assembly.GetTypes().Where(type => DerivesFromDefinition(type, definition)).ToList();
+            IReadOnlyList<Type> derived = definition.Assembly.GetTypes().Where(IsMadeFromTheDefinition).ToList();
 
             Assert.True(definition.IsAbstract, definition.FullName + " is not abstract.");
             Assert.Equal(cases, derived.Select(type => type.DeclaringType == definition ? type.Name : type.FullName).Order(StringComparer.Ordinal));
             Assert.All(derived, type => Assert.True(type.IsSealed, type.FullName + " is not sealed."));
             Assert.All(derived, type => Assert.True(type.MakeGenericType(closedSet.GetGenericArguments()).IsSubclassOf(closedSet),
                 type.FullName + " over " + string.Join(", ", closedSet.GetGenericArguments().Select(argument => argument.Name)) + " does not derive from the set."));
-        }
 
-        /// <summary>Whether a base type of the type, at any depth, is made from the generic definition.</summary>
-        private static bool DerivesFromDefinition(Type type, Type definition)
-        {
-            for (Type? baseType = type.BaseType; baseType is not null; baseType = baseType.BaseType)
+            // Whether a base type of the type, at any depth, is made from the set's generic definition. A local function,
+            // so that the definition is read from this scope and cannot change places with the type at a call.
+            bool IsMadeFromTheDefinition(Type type)
             {
-                if (baseType.IsGenericType && baseType.GetGenericTypeDefinition() == definition)
+                for (Type? baseType = type.BaseType; baseType is not null; baseType = baseType.BaseType)
                 {
-                    return true;
+                    if (baseType.IsGenericType && baseType.GetGenericTypeDefinition() == definition)
+                    {
+                        return true;
+                    }
                 }
-            }
 
-            return false;
+                return false;
+            }
         }
 
         /// <summary>The engine's checks, and: every constructor of the set is private, and no case has a public constructor.</summary>

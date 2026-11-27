@@ -14,8 +14,9 @@ namespace CoveredLot.Core.Tests
     /// GameSession on the Example, the brief's 6x6 board, as the catalogue loads it from the shipped texts (design section
     /// 8.2): the known answers of its taps. A new session shows vehicles 3 and 7 covered, with a peak of 0 and no tap yet.
     /// Vehicle 5 bumps into vehicle 4 at the start, and the state, the vehicles shown covered, the peak and the outcome stay
-    /// as they were. The blue vehicles 0, 3 and 4 fill bays 0 to 2 and leave as a set. The taps 0,3,4,2,8,5,1,6,7 win with a
-    /// peak of 3, the Example's par, for three stars. The taps 0,3,1,8 fill all four bays and fail. After the win and after
+    /// as they were; so they do after taps on ids the Example lacks, which are ignored as not in the lot. The blue vehicles
+    /// 0, 3 and 4 fill bays 0 to 2 and leave as a set. The taps 0,3,4,2,8,5,1,6,7 win with a peak of 3, the Example's par,
+    /// for three stars. The taps 0,3,1,8 fill all four bays and fail. After the win and after
     /// the fail, one more tap is ignored as the level is over and leaves the state, the peak and the outcome as they were,
     /// and after the fail the vehicles shown covered too.
     /// </summary>
@@ -62,6 +63,32 @@ namespace CoveredLot.Core.Tests
             Assert.Equal(new[] { 3, 7 }, ShownCovered(session));
             Assert.Equal(0, session.Peak.Bays.Value);
             Assert.Equal(new Outcome.InPlay(), session.Outcome);
+        }
+
+        /// <summary>
+        /// The engine answers a tap on an id the level lacks with the same NotInLot rejection as a tap on a vehicle that has
+        /// left, so the session ignores both as not in the lot. The Example's vehicles are 0 to 8; 9 and 23, the highest
+        /// piece id, are not among them.
+        /// </summary>
+        [Fact]
+        public void Tapping_ids_the_Example_lacks_is_ignored_as_not_in_the_lot_and_leaves_the_state_the_covers_the_peak_and_the_outcome_as_they_were()
+        {
+            var session = new GameSession(ShippedCatalogue.Example());
+            LotState start = session.State;
+
+            foreach (byte missing in new byte[] { ExampleVehicleCount, PieceId.MaxValue })
+            {
+                TapFeedback feedback = session.Tap(new PieceId(missing));
+
+                TapFeedback.Ignored ignored = Assert.IsType<TapFeedback.Ignored>(feedback);
+                Assert.Same(feedback, session.LastTap);
+                Assert.Equal(new PieceId(missing), ignored.Piece);
+                Assert.Equal(IgnoredTap.NotInLot, ignored.Reason);
+                Assert.Equal(start, session.State);
+                Assert.Equal(new[] { 3, 7 }, ShownCovered(session));
+                Assert.Equal(0, session.Peak.Bays.Value);
+                Assert.Equal(new Outcome.InPlay(), session.Outcome);
+            }
         }
 
         [Fact]
