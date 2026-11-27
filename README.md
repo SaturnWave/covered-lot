@@ -139,6 +139,25 @@ check:
   that has left the lot (`NotInLot`), and win no level below its par. The star rule
   (`Stars.For`) gives three stars when the peak is at most the par, two at one bay more, and
   one for any other win;
+- the board and tag pictures (`BoardPicture`, `CluePicture`), what the board and the tags list
+  show of a session. On the Example they give the known answers: each vehicle's box and label,
+  from `0 (0,1,2x1) B^` to `8 (5,3,1x2) Y>`, and the pillar at (0,4); vehicles 3 and 7 shown
+  covered with no colour and the others open in their own swatch; vehicle 3's badge 1 and its
+  row of the tags list, `1: not R`; after the taps 0 and 3, a ghost for each, vehicle 3's `Bv`
+  with badge 1 at (2,2,2x1), and the row still there; and a bump of vehicle 5 marks tile 4 as
+  its blocker until the next tap. On a variant tagged `Not(3,R);Not(3,Y);Ahead(7,Same);Touch(7,Y,2)`,
+  which the engine writes back as given and whose tags are all true of the board, the rows read
+  `1: not R, not Y` and `2: same as ahead, touches 2 Y`, and the one link runs from cell 27 to
+  cell 24 and stays as vehicles 6 and 7 leave; on another, an east-facing tagged vehicle's link
+  starts at the highest cell of its footprint and its row reads `differs from ahead`. Along the
+  winning order the par search finds for each shipped level, the Example included, the board
+  has a tile for each vehicle in the lot and none for any other, a tile the session shows
+  covered is covered with `?` for its letter, every other tile is open in its vehicle's swatch
+  and letter, and a covered level shows a ghost for each vehicle that has left, a level without
+  covers none; and each Ahead tag of the shipped levels links its vehicle's front cell to the
+  first cell of the vehicle ahead on its path, as the engine's geometry gives them. The palette
+  gives the colour ids 1 to 6 the six swatches with the letters R, B, Y, G, P and O, any other id
+  throws, each swatch has a USS class of its own, and no two style names are the same;
 - the closed sets Core switches over or makes, now or in the pieces to come, pinned case by
   case: the values of the engine's `LotTextProblem`, `LoadProblem`, `FailKind`,
   `InvalidReason`, `Facing` and `AheadRelation`, the cases of its `LotTextResult`,

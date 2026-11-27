@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using CoveredLot.Core.Catalogue;
+using CoveredLot.Core.Pictures;
 using CoveredLot.Core.Session;
 using PuzzleCore.Jam;
 using PuzzleCore.Packs;
@@ -16,12 +17,12 @@ namespace CoveredLot.Core.Tests
     /// <summary>
     /// The closed sets Core switches over or makes (design section 8.4), pinned case by case, so that a case the engine
     /// adds at a later sync fails here, by name, instead of reaching a discard arm on a phone: the engine's results and
-    /// events that the catalogue and the session switch over, the values their cases carry (FailKind, InvalidReason), the
-    /// sets that the pictures and copy of later pieces will switch over (Facing, AheadRelation, LotClue), and Core's own.
-    /// The engine's enums are pinned with their values, which grow only at the end; the engine's result hierarchies by
-    /// every type of its assembly that derives from them, a generic one through its generic definition; Core's own sets
-    /// also by their private constructors, which keep any other assembly from adding a case, and by the cases'
-    /// constructors, none of them public, since only Core makes them.
+    /// events that the catalogue, the session and the pictures switch over, the values their cases carry (FailKind,
+    /// InvalidReason), the sets that the pictures and the copy switch over (Facing, AheadRelation, LotClue), and Core's own.
+    /// The enums are pinned with their values, the engine's of which grow only at the end, and Core's own TileMark and
+    /// Swatch too; the engine's result hierarchies by every type of its assembly that derives from them, a generic one
+    /// through its generic definition; Core's own hierarchies also by their private constructors, which keep any other
+    /// assembly from adding a case, and by the cases' constructors, none of them public, since only Core makes them.
     /// </summary>
     public sealed class ClosedSetPinTests
     {
@@ -166,6 +167,25 @@ namespace CoveredLot.Core.Tests
         public void LevelTextName_is_closed_with_exactly_the_cases_Level_Presentation_and_Example()
         {
             AssertCoreCases(typeof(LevelTextName), "Example", "Level", "Presentation");
+        }
+
+        [Fact]
+        public void TileFace_is_closed_with_exactly_the_cases_Open_and_Covered()
+        {
+            AssertCoreCases(typeof(TileFace), "Covered", "Open");
+        }
+
+        [Fact]
+        public void TileMark_has_exactly_the_values_Plain_and_Blocker_in_this_order()
+        {
+            AssertValues<TileMark>("Plain", "Blocker");
+        }
+
+        /// <summary>The swatches follow the colour ids 1 to 6, so each value is its colour id less one.</summary>
+        [Fact]
+        public void Swatch_has_exactly_these_six_values_in_the_order_of_the_colour_ids()
+        {
+            AssertValues<Swatch>("Red", "Blue", "Yellow", "Green", "Pink", "Orange");
         }
 
         /// <summary>The enum's names in value order, and its values 0 to n-1, so each value's place is pinned too.</summary>

@@ -56,7 +56,8 @@ namespace CoveredLot.Core.Tests.Support
             return listed;
         }
 
-        private static ReadOnlyArray<CatalogueEntry> Entries() => CatalogueDescriptions.EntriesOf(LevelCatalogue.Load(new DiskLevelTexts()));
+        /// <summary>Every entry, as the game lists them: the Example, then Level 1 to N.</summary>
+        public static ReadOnlyArray<CatalogueEntry> Entries() => CatalogueDescriptions.EntriesOf(LevelCatalogue.Load(new DiskLevelTexts()));
     }
 
     /// <summary>A level presentation.json lists: the catalogue's entry for it, and the file's entry for it as the engine reads it.</summary>
