@@ -11,8 +11,11 @@
 #   - the editor log holds a compiler error or warning (error CS or warning CS) for a file under Assets/CoveredLot. The
 #     log holds only what this build compiled: when Bee serves the player's scripts from its cache, the log shows no
 #     compile and this check has nothing to read; csc.rsp's -warnaserror+ stays the guard;
-#   - the build changed what git sees: Unity writes some settings on a target's first build, and the CLI's guard would
-#     refuse the next build until they are committed or reverted.
+#   - the build changed what git sees (each file's status, the diff against HEAD and the untracked files' contents, as
+#     tools/check.sh compares them), because the CLI's guard would refuse the next build. A successful build changes
+#     files when Unity writes settings on a target's first build: review them, then commit or revert them. A failed
+#     build can leave temporary entries, such as the Input System's preloaded actions asset in ProjectSettings.asset,
+#     which Unity removes only after a successful build: revert those.
 # It refuses to start while Temp/UnityLockfile exists. Unity's Gradle and Bee caches follow GRADLE_USER_HOME and
 # BEE_CACHE_DIRECTORY in the environment the editor starts with (piece 12 checked both by path), so the script prints
 # both. It builds the repository it belongs to, from whatever folder it is started.
@@ -34,6 +37,16 @@ readonly TIMEOUT_SECONDS=3600
 readonly METHOD=CoveredLot.EditorTools.DevelopmentBuild.Android
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+# repository_state: what git sees of the working tree, as tools/check.sh records it: every file's status, untracked
+# files included, the diff against HEAD, and the content hashes of the untracked files, which the diff leaves out.
+repository_state() {
+  git status --porcelain=v1 --untracked-files=all || return 1
+  echo "--- diff against HEAD"
+  git diff HEAD --binary || return 1
+  echo "--- untracked contents"
+  git -c core.quotePath=false ls-files --others --exclude-standard | git hash-object --stdin-paths
+}
 
 cli_options=()
 for argument in "$@"; do
@@ -60,7 +73,10 @@ echo "build-android: BEE_CACHE_DIRECTORY=${BEE_CACHE_DIRECTORY:-<unset: the defa
 repo_root="$(pwd -W 2>/dev/null || pwd)"
 mkdir -p "$BUILD_DIR" "$(dirname "$APK")"
 rm -f "$APK" "$LOG" "$CLI_OUTPUT"
-status_before="$(git status --porcelain=v1 --untracked-files=all)"
+# The state files hold the whole diff against HEAD, so they stay in the ignored build folder.
+state_before="$BUILD_DIR/state-before.txt"
+state_after="$BUILD_DIR/state-after.txt"
+repository_state > "$state_before"
 
 started=$SECONDS
 status=0
@@ -91,10 +107,24 @@ else
     failures=1
   fi
 fi
-status_after="$(git status --porcelain=v1 --untracked-files=all)"
-if [ "$status_after" != "$status_before" ]; then
-  echo "build-android: the build changed what git sees; commit or revert these before the next build:" >&2
-  echo "$status_after" >&2
+repository_state > "$state_after"
+if ! cmp -s "$state_before" "$state_after"; then
+  if [ "$status" -ne 0 ]; then
+    echo "build-android: the failed build changed what git sees; a failed build can leave temporary entries, so revert" >&2
+    echo "build-android: what it changed (git checkout -- <file>) rather than commit it:" >&2
+  else
+    echo "build-android: the build changed what git sees; review what it changed, then commit or revert it before the" >&2
+    echo "build-android: next build:" >&2
+  fi
+  status_lines_before="$(sed '/^--- diff against HEAD$/q' "$state_before")"
+  status_lines_after="$(sed '/^--- diff against HEAD$/q' "$state_after")"
+  if [ "$status_lines_before" = "$status_lines_after" ]; then
+    echo "build-android: a file that already differed from HEAD, or an untracked file, changed; one of these:" >&2
+    git status --short --untracked-files=all >&2 || true
+  else
+    echo "build-android: git status before (<) and after (>) the build:" >&2
+    diff <(echo "$status_lines_before") <(echo "$status_lines_after") >&2 || true
+  fi
   failures=1
 fi
 
