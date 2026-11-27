@@ -18,8 +18,9 @@ namespace CoveredLot.Core.Tests
     /// the winning order it finds, tapped through a new session, wins with three stars. Seeded runs of taps on any of a
     /// level's vehicles, blocked ones and ones that have left included, then check what the session works out itself
     /// against the engine: after every tap the peak equals LotSolver.PeakOf over the exits played, each bump names the
-    /// first blocker the level gives for the vehicles still in the lot before the tap, and no win has a peak below the
-    /// par. Every count is asserted, so no check can pass on an empty walk.
+    /// first blocker the level gives for the vehicles still in the lot before the tap, each ignored tap was on a vehicle
+    /// that had left the lot and says so (NotInLot), and no win has a peak below the par. Every count is asserted, so no
+    /// check can pass on an empty walk.
     /// </summary>
     public sealed class ShippedLevelSessionTests
     {
@@ -92,7 +93,7 @@ namespace CoveredLot.Core.Tests
         }
 
         [Fact]
-        public void Seeded_runs_of_taps_keep_the_peak_and_each_bump_true_to_the_engine_and_win_no_level_below_its_par()
+        public void Seeded_runs_of_taps_keep_the_peak_each_bump_and_each_ignored_tap_true_to_the_engine_and_win_no_level_below_its_par()
         {
             IReadOnlyList<ListedLevel> levels = ShippedCatalogue.Listed();
 
@@ -181,7 +182,7 @@ namespace CoveredLot.Core.Tests
             private void TapOnce()
             {
                 var piece = new PieceId((byte)_random.NextIndex(Lot.VehicleCount));
-                uint exitedBefore = _session.State.Exited;
+                LotState before = _session.State;
                 TapFeedback feedback = _session.Tap(piece);
                 _taps++;
                 string tap = _name + " tap " + Number(_taps) + " (vehicle " + Number(piece.Value) + ")";
@@ -193,10 +194,11 @@ namespace CoveredLot.Core.Tests
                         break;
                     case TapFeedback.Bumped bumped:
                         _tally.Bumps++;
-                        CheckBlocker(bumped.Blocker, Lot.FirstBlocker(piece, exitedBefore), tap);
+                        CheckBlocker(bumped.Blocker, Lot.FirstBlocker(piece, before.Exited), tap);
                         break;
-                    case TapFeedback.Ignored:
+                    case TapFeedback.Ignored ignored:
                         _tally.Ignored++;
+                        CheckIgnored(ignored.Reason, before.HasExited(piece), tap);
                         break;
                     default:
                         _tally.Wrong.Add(tap + ": gave " + feedback.GetType().Name);
@@ -216,6 +218,18 @@ namespace CoveredLot.Core.Tests
                 if (firstBlocker != Option.Some(bumpedInto))
                 {
                     _tally.Wrong.Add(tap + ": bumped into " + bumpedInto + ", the level's first blocker is " + firstBlocker);
+                }
+            }
+
+            /// <summary>
+            /// A run taps only the level's vehicles and ends when the level is over, so a tap of it is ignored only as one on a
+            /// vehicle that has left the lot, NotInLot.
+            /// </summary>
+            private void CheckIgnored(IgnoredTap reason, bool hadLeft, string tap)
+            {
+                if (reason != IgnoredTap.NotInLot || !hadLeft)
+                {
+                    _tally.Wrong.Add(tap + ": ignored as " + reason.ToString() + ", and the vehicle had " + (hadLeft ? "left" : "not left") + " the lot");
                 }
             }
 

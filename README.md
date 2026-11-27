@@ -129,14 +129,16 @@ check:
   and no tap yet; tapping vehicle 5 first bumps it into vehicle 4 and leaves the state, the
   covers shown, the peak and the outcome as they were; the taps 0,3,4 reach a peak of 3 and
   leave every bay empty; the taps 0,3,4,2,8,5,1,6,7 win with a peak of 3 for three stars; and
-  the taps 0,3,1,8 fail with the bays full, after which a tap is ignored as the level is over
-  and again leaves all four as they were. On each of the 98 levels `presentation.json` lists,
-  the engine's par search with the level's own bays and 200,000 nodes finds the `peakPar` the
-  file gives, and the winning order it finds wins through a session with three stars. Three
-  seeded runs of taps per level, on any of its vehicles, keep the peak equal to
-  `LotSolver.PeakOf` over the exits played after every tap, give each bump the first blocker
-  the engine's level names, and win no level below its par. The star rule (`Stars.For`) gives
-  three stars when the peak is at most the par, two at one bay more, and one for any other win;
+  the taps 0,3,1,8 fail with the bays full. After the win and after the fail, a tap is ignored
+  as the level is over and leaves the state, the peak and the outcome as they were. On each of
+  the 98 levels `presentation.json` lists, the engine's par search with the level's own bays
+  and 200,000 nodes finds the `peakPar` the file gives, and the winning order it finds wins
+  through a session with three stars. Three seeded runs of taps per level, on any of its
+  vehicles, keep the peak equal to `LotSolver.PeakOf` over the exits played after every tap,
+  give each bump the first blocker the engine's level names, ignore a tap only on a vehicle
+  that has left the lot (`NotInLot`), and win no level below its par. The star rule
+  (`Stars.For`) gives three stars when the peak is at most the par, two at one bay more, and
+  one for any other win;
 - the closed sets Core switches over or makes, now or in the pieces to come, pinned case by
   case: the values of the engine's `LotTextProblem`, `LoadProblem`, `FailKind`,
   `InvalidReason`, `Facing` and `AheadRelation`, the cases of its `LotTextResult`,
@@ -205,8 +207,9 @@ tests check:
   shows vehicles 3 and 7 covered with a peak of 0 and no tap yet, tapping vehicle 5 first bumps
   it into vehicle 4 and leaves the state, the covers shown, the peak and the outcome as they
   were, the taps 0,3,4 reach a peak of 3 and leave every bay empty, the taps 0,3,4,2,8,5,1,6,7
-  win with a peak of 3 for three stars, and the taps 0,3,1,8 fill the bays and fail, after
-  which a tap is ignored as the level is over and again leaves all four as they were;
+  win with a peak of 3 for three stars, and the taps 0,3,1,8 fill the bays and fail; after the
+  win and after the fail, a tap is ignored as the level is over and leaves the state, the peak
+  and the outcome as they were;
 - the settings that Unity reads through its own APIs: portrait, the product name
   `Covered Lot`, which is also the title the game shows, the Android application id, IL2CPP,
   ARM64 only, API level 25 (Unity reads a lower saved level as 25, so the .NET checks pin the

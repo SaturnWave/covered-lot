@@ -15,8 +15,9 @@ namespace CoveredLot.Core.Tests
     /// 8.2): the known answers of its taps. A new session shows vehicles 3 and 7 covered, with a peak of 0 and no tap yet.
     /// Vehicle 5 bumps into vehicle 4 at the start, and the state, the vehicles shown covered, the peak and the outcome stay
     /// as they were. The blue vehicles 0, 3 and 4 fill bays 0 to 2 and leave as a set. The taps 0,3,4,2,8,5,1,6,7 win with a
-    /// peak of 3, the Example's par, for three stars. The taps 0,3,1,8 fill all four bays and fail, and a tap after that is
-    /// ignored as the level is over, again with all four as they were.
+    /// peak of 3, the Example's par, for three stars. The taps 0,3,1,8 fill all four bays and fail. After the win and after
+    /// the fail, one more tap is ignored as the level is over and leaves the state, the peak and the outcome as they were,
+    /// and after the fail the vehicles shown covered too.
     /// </summary>
     /// <remarks>
     /// The session shows the state, the outcome, the peak, the last tap and which vehicles it shows covered, not the
@@ -76,19 +77,36 @@ namespace CoveredLot.Core.Tests
             Assert.Equal(new Outcome.InPlay(), session.Outcome);
         }
 
+        /// <summary>
+        /// After a win the engine's attempt refuses every action, where after a fail its rules answer each tap; so the tap
+        /// after the win is the one known answer that reaches the session's Refused arm.
+        /// </summary>
         [Fact]
-        public void The_taps_0_3_4_2_8_5_1_6_7_win_with_a_peak_of_3_for_three_stars()
+        public void The_taps_0_3_4_2_8_5_1_6_7_win_with_a_peak_of_3_for_three_stars_and_one_more_tap_is_ignored_as_the_level_is_over()
         {
             CatalogueEntry example = ShippedCatalogue.Example();
             var session = new GameSession(example);
+            var zero = new PieceId(0);
 
             IReadOnlyList<string> notMoved = TapAll(session, 0, 3, 4, 2, 8, 5, 1, 6, 7);
+            Outcome won = session.Outcome;
+            LotState empty = session.State;
+            int peak = session.Peak.Bays.Value;
+            StarRating stars = Stars.For(session.Peak, example.PeakPar);
+            TapFeedback feedback = session.Tap(zero);
 
             Assert.Empty(notMoved);
-            Assert.Equal(new Outcome.Won(), session.Outcome);
-            Assert.Equal(3, session.Peak.Bays.Value);
+            Assert.Equal(new Outcome.Won(), won);
+            Assert.Equal(3, peak);
             Assert.Equal(3, example.PeakPar.Bays.Value);
-            Assert.Equal(StarRating.Three, Stars.For(session.Peak, example.PeakPar));
+            Assert.Equal(StarRating.Three, stars);
+            TapFeedback.Ignored ignored = Assert.IsType<TapFeedback.Ignored>(feedback);
+            Assert.Same(feedback, session.LastTap);
+            Assert.Equal(zero, ignored.Piece);
+            Assert.Equal(IgnoredTap.LevelOver, ignored.Reason);
+            Assert.Equal(empty, session.State);
+            Assert.Equal(peak, session.Peak.Bays.Value);
+            Assert.Equal(new Outcome.Won(), session.Outcome);
         }
 
         [Fact]

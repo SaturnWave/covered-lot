@@ -25,9 +25,9 @@ namespace CoveredLot.Tests.EditMode
     /// catalogue's Example, GameSession gives the known answers that the .NET tests pin: a new session shows vehicles 3
     /// and 7 covered with a peak of 0 and no tap yet; vehicle 5 bumps into vehicle 4 and leaves the state, the vehicles
     /// shown covered, the peak and the outcome as they were; the taps 0,3,4 reach a peak of 3 and leave every bay empty;
-    /// the taps 0,3,4,2,8,5,1,6,7 win with a peak of 3 for three stars; and the taps 0,3,1,8 fill the bays and fail, after
-    /// which a tap is ignored as the level is over, again with all four as they were. The counts are asserted, so no check
-    /// can pass on an empty list.
+    /// the taps 0,3,4,2,8,5,1,6,7 win with a peak of 3 for three stars; and the taps 0,3,1,8 fill the bays and fail. After
+    /// the win and after the fail, a tap is ignored as the level is over and leaves the state, the peak and the outcome as
+    /// they were. The counts are asserted, so no check can pass on an empty list.
     /// </summary>
     [HostileCulture]
     public sealed class CoreInUnityTests
@@ -179,18 +179,35 @@ namespace CoveredLot.Tests.EditMode
         }
 
         [Test]
-        public void The_taps_0_3_4_2_8_5_1_6_7_win_with_a_peak_of_3_for_three_stars()
+        public void The_taps_0_3_4_2_8_5_1_6_7_win_with_a_peak_of_3_for_three_stars_and_one_more_tap_is_ignored_as_the_level_is_over()
         {
             CatalogueEntry example = ExampleEntry();
             var session = new GameSession(example);
+            var zero = new PieceId(0);
 
             IReadOnlyList<string> notMoved = TapAll(session, 0, 3, 4, 2, 8, 5, 1, 6, 7);
+            Outcome won = session.Outcome;
+            LotState empty = session.State;
+            int peak = session.Peak.Bays.Value;
+            StarRating stars = Stars.For(session.Peak, example.PeakPar);
+            TapFeedback feedback = session.Tap(zero);
 
             Assert.That(notMoved, Is.Empty, "taps that did not move their vehicle");
-            Assert.That(session.Outcome, Is.EqualTo(new Outcome.Won()), "the outcome after the nine taps");
-            Assert.That(session.Peak.Bays.Value, Is.EqualTo(3), "the peak after the nine taps");
+            Assert.That(won, Is.EqualTo(new Outcome.Won()), "the outcome after the nine taps");
+            Assert.That(peak, Is.EqualTo(3), "the peak after the nine taps");
             Assert.That(example.PeakPar.Bays.Value, Is.EqualTo(ExamplePeakPar), "the Example's par");
-            Assert.That(Stars.For(session.Peak, example.PeakPar), Is.EqualTo(StarRating.Three), "the stars of the win");
+            Assert.That(stars, Is.EqualTo(StarRating.Three), "the stars of the win");
+            Assert.That(session.LastTap, Is.SameAs(feedback), "the session's last tap and the feedback the tap returned");
+            if (!(feedback is TapFeedback.Ignored ignored))
+            {
+                throw new AssertionException("Tapping vehicle 0 after the win gave " + feedback.GetType().Name + ", not Ignored.");
+            }
+
+            Assert.That(ignored.Piece, Is.EqualTo(zero), "the vehicle of the ignored tap");
+            Assert.That(ignored.Reason, Is.EqualTo(IgnoredTap.LevelOver), "why the tap was ignored");
+            Assert.That(session.State, Is.EqualTo(empty), "the state after the ignored tap");
+            Assert.That(session.Peak.Bays.Value, Is.EqualTo(peak), "the peak after the ignored tap");
+            Assert.That(session.Outcome, Is.EqualTo(new Outcome.Won()), "the outcome after the ignored tap");
         }
 
         [Test]
