@@ -176,6 +176,18 @@ namespace CoveredLot.Core.Tests
         }
 
         [Fact]
+        public void BayPicture_is_closed_with_exactly_the_cases_Empty_and_Filled()
+        {
+            AssertCoreCases(typeof(BayPicture), "Empty", "Filled");
+        }
+
+        [Fact]
+        public void EndPicture_is_closed_with_exactly_the_cases_Playing_Cleared_BaysFull_and_NoMoveLeft()
+        {
+            AssertCoreCases(typeof(EndPicture), "BaysFull", "Cleared", "NoMoveLeft", "Playing");
+        }
+
+        [Fact]
         public void TileMark_has_exactly_the_values_Plain_and_Blocker_in_this_order()
         {
             AssertValues<TileMark>("Plain", "Blocker");

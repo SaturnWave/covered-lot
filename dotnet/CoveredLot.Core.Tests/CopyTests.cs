@@ -2,24 +2,31 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Reflection;
 using CoveredLot.Core.Catalogue;
 using CoveredLot.Core.Tests.Support;
+using PuzzleCore;
 using PuzzleCore.Jam;
 using Xunit;
 
 namespace CoveredLot.Core.Tests
 {
     /// <summary>
-    /// The catalogue's copy (design section 9): the problem screen's one sentence for players, and the development-only
-    /// line of each catalogue problem, exact for every kind of problem and both kinds of level source, with the slot in
-    /// four digits or more. The words for the engine's LotTextProblem and LoadProblem values come from explicit maps, never
-    /// an enum's name, which cover every value the engine declares, found by reflection, so a new value fails here (and
-    /// in the pins) at the next sync. Every line is printable ASCII and holds none of the brief's banned words, and the
-    /// rules are shown to catch each planted break. The tests run under tr-TR and under sv-SE, and the exact lines are the
-    /// same under both.
+    /// The catalogue's copy and the screens' own words (design section 9): the problem screen's one sentence for players,
+    /// and the development-only line of each catalogue problem, exact for every kind of problem and both kinds of level
+    /// source, with the slot in four digits or more. The words for the engine's LotTextProblem and LoadProblem values come
+    /// from explicit maps, never an enum's name, which cover every value the engine declares, found by reflection, so a
+    /// new value fails here (and in the pins) at the next sync. The buttons and the headings read exactly as the design
+    /// gives them, and each entry of the shipped catalogue is titled "Example" or "Level n" by its place. Every line of the
+    /// catalogue's copy and every public string constant of Copy is printable ASCII and holds none of the banned words; the
+    /// text rules (TextRules) ban exactly jam, parking, bus, tray, board and block, and are shown to catch each planted
+    /// break. The tests run under tr-TR and under sv-SE, and the exact lines are the same under both.
     /// </summary>
     public sealed class CopyTests
     {
+        /// <summary>Copy's public string constants: the game's title, the problem screen's sentence, five buttons and three headings.</summary>
+        private const int PublicStringConstants = 10;
+
         private static readonly IReadOnlyDictionary<string, Func<LineCase>> LineCases = new Dictionary<string, Func<LineCase>>(StringComparer.Ordinal)
         {
             ["an unreadable presentation"] = () => Case(FakeLevelTexts.Shipped().WithPresentation("{\"format\":"), "presentation: missing or unreadable"),
@@ -52,6 +59,58 @@ namespace CoveredLot.Core.Tests
         public void The_problem_screen_tells_players_exactly_that_some_levels_could_not_be_loaded()
         {
             Assert.Equal("Some levels could not be loaded.", Copy.LevelsNotLoaded);
+        }
+
+        [Fact]
+        public void The_buttons_and_the_headings_read_exactly_as_the_design_gives_them()
+        {
+            Assert.Equal(
+                new[] { "Levels", "Restart", "Play again", "Next level", "Retry", "Cleared!", "Still covered:", "Tags:" },
+                new[] { Copy.Levels, Copy.Restart, Copy.PlayAgain, Copy.NextLevel, Copy.Retry, Copy.ClearedHeading, Copy.StillCoveredHeading, Copy.TagsHeading });
+        }
+
+        [Fact]
+        public void Each_entry_of_the_shipped_catalogue_is_titled_Example_or_Level_n_by_its_place()
+        {
+            ReadOnlyArray<CatalogueEntry> entries = ShippedCatalogue.Entries();
+
+            var expected = new List<string> { "Example" };
+            var titles = new List<string>();
+            for (int position = 0; position < entries.Count; position++)
+            {
+                titles.Add(Copy.TitleOf(entries[position].Title));
+                if (position > 0)
+                {
+                    expected.Add("Level " + position.ToString(CultureInfo.InvariantCulture));
+                }
+            }
+
+            Assert.Equal(ShippedCatalogue.ListedLevelCount + 1, entries.Count);
+            Assert.Equal(expected, titles);
+        }
+
+        [Fact]
+        public void Every_public_string_constant_of_Copy_is_printable_ascii_and_holds_no_banned_word()
+        {
+            IReadOnlyList<FieldInfo> constants = typeof(Copy).GetFields(BindingFlags.Public | BindingFlags.Static)
+                .Where(field => field.IsLiteral && field.FieldType == typeof(string))
+                .ToList();
+
+            var broken = new List<string>();
+            foreach (FieldInfo constant in constants)
+            {
+                string line = (string?)constant.GetRawConstantValue() ?? string.Empty;
+                broken.AddRange(CopyRules.BrokenBy(line).Select(rule => constant.Name + " '" + line + "' " + rule));
+            }
+
+            Assert.Equal(PublicStringConstants, constants.Count);
+            Assert.True(broken.Count == 0, string.Join("\n", broken));
+        }
+
+        [Fact]
+        public void The_text_rules_ban_exactly_jam_parking_bus_tray_board_and_block()
+        {
+            Assert.Equal(new[] { "jam", "parking", "bus", "tray", "board", "block" }, TextRules.BannedWords);
         }
 
         [Theory]
@@ -172,6 +231,7 @@ namespace CoveredLot.Core.Tests
         [InlineData("caf\u00E9", "holds a character that is not printable ASCII")]
         [InlineData("tab\there", "holds a character that is not printable ASCII")]
         [InlineData("line\n", "holds a character that is not printable ASCII")]
+        [InlineData("delete\u007F", "holds a character that is not printable ASCII")]
         public void The_copy_rules_report_each_planted_break(string line, string rule)
         {
             Assert.Equal(new[] { rule }, CopyRules.BrokenBy(line));

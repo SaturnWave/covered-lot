@@ -10,11 +10,38 @@ namespace CoveredLot.Core.Tests.Support
     /// The pictures written out as plain lines in the tests' own words, as the plan writes them: a tile as its vehicle, its
     /// box (row, column, rows x columns) and its label ("3 (2,2,2x1) ?v"), a pillar as its cell and its glyph ("(0,4) #"),
     /// a row of the tags list as its badge and its line ("1: not R, not Y"), and a link as the indexes of its two cells
-    /// ("cell 27 to cell 24"), worked out again through the engine's LotSize. A test compares lists of them, so a failure
-    /// shows every line that differs.
+    /// ("cell 27 to cell 24"), worked out again through the engine's LotSize; a bay as its letter and swatch ("B Blue") or
+    /// "empty", a ledger pill as its text and swatch ("R 1 Red"), and an end card as its case and its lines
+    /// ("Cleared(Three, 3 stars, Most bays used: 3 (par 3))"). A test compares lists of them, so a failure shows every line
+    /// that differs.
     /// </summary>
     internal static class PictureDescriptions
     {
+        /// <summary>"B Blue", or "empty". A kind of bay the tests do not know is described by its type, so a comparison fails on it without a throw.</summary>
+        public static string Bay(BayPicture bay) => bay switch
+        {
+            BayPicture.Filled filled => filled.Letter + " " + filled.Swatch.ToString(),
+            BayPicture.Empty => "empty",
+            _ => "an unknown kind of bay, " + bay.GetType().Name,
+        };
+
+        /// <summary>"R 1 Red".</summary>
+        public static string Pill(LedgerPill pill) => pill.Text + " " + pill.Swatch.ToString();
+
+        /// <summary>
+        /// "Playing", "Cleared(Three, 3 stars, Most bays used: 3 (par 3))", "BaysFull(All bays are full.)" or "NoMoveLeft(No
+        /// move is possible.)". A kind of card the tests do not know is described by its type, so a comparison fails on it
+        /// without a throw.
+        /// </summary>
+        public static string End(EndPicture end) => end switch
+        {
+            EndPicture.Playing => "Playing",
+            EndPicture.Cleared cleared => "Cleared(" + cleared.Rating.ToString() + ", " + cleared.StarsLine + ", " + cleared.PeakLine + ")",
+            EndPicture.BaysFull full => "BaysFull(" + full.Text + ")",
+            EndPicture.NoMoveLeft noMove => "NoMoveLeft(" + noMove.Text + ")",
+            _ => "an unknown kind of card, " + end.GetType().Name,
+        };
+
         /// <summary>"3 (2,2,2x1) ?v".</summary>
         public static string Tile(TilePicture tile) => Number(tile.Piece.Value) + " " + Box(tile.Box) + " " + tile.Label;
 

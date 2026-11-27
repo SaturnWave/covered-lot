@@ -158,6 +158,25 @@ check:
   first cell of the vehicle ahead on its path, as the engine's geometry gives them. The palette
   gives the colour ids 1 to 6 the six swatches with the letters R, B, Y, G, P and O, any other id
   throws, each swatch has a USS class of its own, and no two style names are the same;
+- the HUD and the end card (`HudPicture`, `EndPicture`) and their copy. On the Example the HUD
+  reads `4 bays free` and `Most bays used: 0 (par 3)` at the start, over four empty bays, with
+  the ledger `R 1`, `B 1`, `Y 0` and the row `1: not R`; after the taps 0 and 3 the ledger
+  reads `R 1`, `B 0`, `Y 0` and the status `Cover lifted: blue.`; after 0, 3 and 4, `Three blue
+  cleared.`; after 0, 3 and 1 the bays hold B, B, R and an empty one, with `1 bay free`; and a
+  bump reads `Something is in its way.`. Along the winning line the status names each lifted
+  cover and cleared set, joined by a space when one tap does both, and on the Example with its
+  blue vehicles made green, pink or orange it names those colours. Level 1, which has no
+  covers, shows no ledger and no tags list. The winning line's card is the win card with three
+  stars, `3 stars` and `Most bays used: 3 (par 3)`, and the taps 0,3,1,8 give the fail card's
+  `All bays are full.`; a win one bay over its par reads `2 stars`, two over `1 star`, and a
+  fail with no move left, which no loaded level reaches, `No move is possible.`. The buttons
+  and the headings read as the design gives them, and each entry is titled `Example` or
+  `Level n`. Along the winning order of every shipped level and in the seeded runs, every
+  string of the board, the HUD and the end card, found by walking the pictures, is printable
+  ASCII and holds none of the banned words (`TextRules`: jam, parking, bus, tray, board and
+  block, in any letter case); in the seeded runs, after every tap, the HUD's bays also hold
+  what the state's bays hold, its ledger counts the vehicles the engine's rules call covered,
+  and each tile lies over exactly its vehicle's footprint;
 - the closed sets Core switches over or makes, now or in the pieces to come, pinned case by
   case: the values of the engine's `LotTextProblem`, `LoadProblem`, `FailKind`,
   `InvalidReason`, `Facing` and `AheadRelation`, the cases of its `LotTextResult`,

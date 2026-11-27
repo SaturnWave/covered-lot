@@ -3,16 +3,21 @@ using System.Collections.Generic;
 using System.Globalization;
 using CoveredLot.Core.Catalogue;
 using CoveredLot.Core.Pictures;
+using CoveredLot.Core.Session;
 using PuzzleCore;
 using PuzzleCore.Jam;
+using PuzzleCore.Rules;
 
 namespace CoveredLot.Core
 {
     /// <summary>
-    /// Every string the game shows lives here, so a change of wording is a one-line edit (design section 9). The copy is
-    /// printable ASCII and holds none of the words the brief keeps out of the game's text, development lines included. It
-    /// writes numbers with the invariant culture only, so a line reads the same on every device. It holds the game's title,
-    /// the problem screen's lines, and the board's and the tags list's words and glyphs for now; later pieces add the rest.
+    /// Every string the game shows lives here, so a change of wording is a one-line edit (design section 9). The copy keeps
+    /// the text rules (<see cref="TextRules"/>): it is printable ASCII and holds none of the banned words, development lines
+    /// included. It writes numbers with the invariant culture only, so a line reads the same on every device. It holds the
+    /// game's title, the entries' titles, the buttons and the headings, the HUD's lines, the status lines, the end card's
+    /// lines, the board's and the tags list's words and glyphs, and the problem screen's lines; the development line comes
+    /// with a later piece. The pictures hold every string they show, so the members that only the pictures use are
+    /// internal, and the public ones are what the screens show by themselves.
     /// </summary>
     public static class Copy
     {
@@ -22,17 +27,94 @@ namespace CoveredLot.Core
         /// <summary>The problem screen's one sentence for players, whatever the catalogue's problems are.</summary>
         public const string LevelsNotLoaded = "Some levels could not be loaded.";
 
+        /// <summary>The button that goes back to the level list: on the top bar, and on the win card and the fail card.</summary>
+        public const string Levels = "Levels";
+
+        /// <summary>The top bar's button that starts the level again.</summary>
+        public const string Restart = "Restart";
+
+        /// <summary>The heading of the ledger, before its pills.</summary>
+        public const string StillCoveredHeading = "Still covered:";
+
+        /// <summary>The heading of the tags list, above its rows.</summary>
+        public const string TagsHeading = "Tags:";
+
+        /// <summary>The win card's heading.</summary>
+        public const string ClearedHeading = "Cleared!";
+
+        /// <summary>The win card's button that plays the level again.</summary>
+        public const string PlayAgain = "Play again";
+
+        /// <summary>The win card's button that opens the next entry of the list; the card has none after the last entry.</summary>
+        public const string NextLevel = "Next level";
+
+        /// <summary>The fail card's button that starts the level again.</summary>
+        public const string Retry = "Retry";
+
         /// <summary>What a covered vehicle's label shows in place of its colour's letter, as in "?v".</summary>
         internal const string HiddenColourGlyph = "?";
 
         /// <summary>What a pillar's cell shows.</summary>
         internal const string PillarGlyph = "#";
 
+        /// <summary>The status line after a bump, whatever stands first on the vehicle's path.</summary>
+        internal const string SomethingInTheWay = "Something is in its way.";
+
+        /// <summary>The fail card's sentence when every bay is full, Failed(SlotsFull).</summary>
+        internal const string AllBaysFull = "All bays are full.";
+
+        /// <summary>The fail card's sentence when no vehicle can leave, Failed(NoLegalMove), which no loaded level reaches (BRIEF:47).</summary>
+        internal const string NoMovePossible = "No move is possible.";
+
         private const string PresentationLabel = "presentation";
         private const string ExampleLabel = "example";
 
         /// <summary>What stands between the tags of one row of the tags list, as in "not R, not Y".</summary>
         private const string TagSeparator = ", ";
+
+        /// <summary>What stands between the parts of a status line, as in "Cover lifted: red. Three red cleared."</summary>
+        private const string StatusSeparator = " ";
+
+        /// <summary>What the level list and the top bar call an entry: "Example", or "Level 12" for the twelfth listed level.</summary>
+        public static string TitleOf(EntryTitle title) => title switch
+        {
+            EntryTitle.Example => "Example",
+            EntryTitle.Numbered numbered => "Level " + Number(numbered.Number.Value),
+            _ => throw new ArgumentOutOfRangeException(nameof(title), "Copy has no title for this kind of entry."),
+        };
+
+        /// <summary>The HUD's line of the bays that are free now (BRIEF:408): "4 bays free", and "1 bay free" for one.</summary>
+        internal static string BaysFreeLine(int freeBays) => freeBays == 1 ? "1 bay free" : Number(freeBays) + " bays free";
+
+        /// <summary>The peak against the par, on the HUD and on the win card (BRIEF:74): "Most bays used: 3 (par 3)".</summary>
+        internal static string PeakLine(Peak peak, PeakPar par) =>
+            "Most bays used: " + Number(peak.Bays.Value) + " (par " + Number(par.Bays.Value) + ")";
+
+        /// <summary>The win card's stars: "3 stars", "2 stars" or "1 star".</summary>
+        internal static string StarsLine(StarRating rating) => rating switch
+        {
+            StarRating.One => "1 star",
+            StarRating.Two => "2 stars",
+            StarRating.Three => "3 stars",
+            _ => throw new ArgumentOutOfRangeException(nameof(rating), "Copy has no words for this star rating."),
+        };
+
+        /// <summary>A pill of the ledger: the colour's letter, then how many vehicles of it are still covered, "R 1".</summary>
+        internal static string PillText(ColourId colour, int covered) => Palette.LetterOf(colour) + " " + Number(covered);
+
+        /// <summary>
+        /// The status line after the last tap (design section 9). It is empty before the first tap and after an ignored one,
+        /// and reads "Something is in its way." after a bump. After a move it says what the move's events say, in the
+        /// engine's order and joined by a space: "Cover lifted: blue." when a covered vehicle left, "Three blue cleared."
+        /// when a set left the bays, both when one move did both, and nothing when it did neither.
+        /// </summary>
+        internal static string StatusLine(TapFeedback lastTap) => lastTap switch
+        {
+            TapFeedback.None or TapFeedback.Ignored => string.Empty,
+            TapFeedback.Moved moved => StatusOf(moved.Events),
+            TapFeedback.Bumped => SomethingInTheWay,
+            _ => throw new ArgumentOutOfRangeException(nameof(lastTap), "Copy has no status line for this kind of tap feedback."),
+        };
 
         /// <summary>
         /// What the tags list says for one tag (design section 9): "not R" for a Not tag, "same as ahead" or "differs from
@@ -123,6 +205,46 @@ namespace CoveredLot.Core
             AheadRelation.Same => "same as ahead",
             AheadRelation.Differs => "differs from ahead",
             _ => throw new UnknownEngineCaseException(relation),
+        };
+
+        /// <summary>The status line after a move with these events: what each event says, in the engine's order, joined by a space.</summary>
+        private static string StatusOf(ReadOnlyArray<PuzzleEvent> events)
+        {
+            var parts = new List<string>();
+            foreach (PuzzleEvent item in events)
+            {
+                if (StatusPartOf(item).TryGet(out string? part))
+                {
+                    parts.Add(part);
+                }
+            }
+
+            return string.Join(StatusSeparator, parts);
+        }
+
+        /// <summary>
+        /// What the status line says for one event of a move: a lifted cover and a cleared set, each with its colour's name;
+        /// the exit itself, a win, a fail, a spare and a rewind say nothing. Every kind is named, so that a kind a later
+        /// engine adds reaches the discard arm instead of passing unseen; the pin tests catch it at the next sync first.
+        /// </summary>
+        private static Option<string> StatusPartOf(PuzzleEvent item) => item switch
+        {
+            PuzzleEvent.CoverLifted lifted => Option.Some("Cover lifted: " + NameOf(lifted.Colour) + "."),
+            PuzzleEvent.SetCleared cleared => Option.Some("Three " + NameOf(cleared.Colour) + " cleared."),
+            PuzzleEvent.Exited or PuzzleEvent.Won or PuzzleEvent.Failed or PuzzleEvent.SpareAdded or PuzzleEvent.Rewound => Option.None<string>(),
+            _ => throw new UnknownEngineCaseException(item),
+        };
+
+        /// <summary>A colour's name in a status line, by its swatch: "blue" for colour id 2.</summary>
+        private static string NameOf(ColourId colour) => Palette.SwatchOf(colour) switch
+        {
+            Swatch.Red => "red",
+            Swatch.Blue => "blue",
+            Swatch.Yellow => "yellow",
+            Swatch.Green => "green",
+            Swatch.Pink => "pink",
+            Swatch.Orange => "orange",
+            _ => throw new ArgumentOutOfRangeException(nameof(colour), "Copy has no name for this colour's swatch."),
         };
 
         private static string LabelOf(LevelSource source) => source switch
