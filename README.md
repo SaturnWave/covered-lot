@@ -278,15 +278,20 @@ tests check:
   `CoveredLot.uss`), over the catalogue `ResourcesLevelTexts` loads, with the Example open:
   clicking tile 5 outlines tile 4 alone and the status reads `Something is in its way.` until
   the next tap; the winning line shows the win card with `Cleared!`, `3 stars` and `Most bays
-  used: 3 (par 3)`, and Play again, Next level and Levels; the taps 0,3,1,8 show the fail card,
-  `All bays are full.` with Retry and Levels, over the lot, so a click at the centre of each
-  of the 5 tiles left reaches the card; Retry then shows nine tiles, tile 3 covered as `?v`,
-  the ledger `R 1`, `B 1`, `Y 0`, no blocker outline and no card; a bump followed by Restart
-  leaves no blocker outline and an empty status line; after the taps 0 and 3 the ghosts of 0
-  and 3 show, the ghost of 3 reading `Bv` with badge 1, and the tags list keeps its row `1`,
-  `not R`; an entry made from the variant text tagged `Not(3,R);Not(3,Y);Ahead(7,Same);Touch(7,Y,2)`
-  shows one link, from cell 27 to cell 24, and draws its arrow; in play and with each card,
-  every button shown is at least 48 x 48 units and every label at least 14, a badge 12, with the
+  used: 3 (par 3)`, and Play again, Next level and Levels; Next level then opens Level 1, a
+  plain level of nine vehicles and 5 bays, where, once its vehicle 3 has left, 8 tiles show,
+  the bays read Y and four empty ones with `4 bays free` and `Most bays used: 1 (par 3)`, and
+  no ledger, tags list, badge, covered tile, ghost or card shows; the taps 0,3,1,8 show the
+  fail card, `All bays are full.` with Retry and Levels, over the lot and filled with the page
+  colour, so nothing shows through it and a click at the centre of each of the 5 tiles left
+  reaches the card; where the fail left the bays B, B, R and Y with `0 bays free`, Retry then
+  shows four empty bays with `4 bays free` and `Most bays used: 0 (par 3)`, nine tiles, tile 3
+  covered as `?v`, the ledger `R 1`, `B 1`, `Y 0`, no blocker outline and no card; a bump
+  followed by Restart leaves no blocker outline and an empty status line; after the taps 0 and
+  3 the ghosts of 0 and 3 show, the ghost of 3 reading `Bv` with badge 1, and the tags list
+  keeps its row `1`, `not R`; an entry made from the variant text tagged
+  `Not(3,R);Not(3,Y);Ahead(7,Same);Touch(7,Y,2)` shows one link, from cell 27 to cell 24,
+  and draws its arrow; in play and with each card, every button shown is at least 48 x 48 units and every label at least 14, a badge 12, with the
   counts of buttons and labels pinned; and the title, the status line, the HUD's lines, the
   headings, the pills and the tags show the ink of `CoveredLot.uss`, not a colour of the default
   theme;

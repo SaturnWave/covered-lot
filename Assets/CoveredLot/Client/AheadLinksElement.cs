@@ -73,7 +73,7 @@ namespace CoveredLot.Client
                 painter.lineWidth = _lineWidth;
                 foreach (AheadLinkPicture link in _links)
                 {
-                    if (DrawArrow(painter, PointOf(geometry.CentreOf(link.From)), PointOf(geometry.CentreOf(link.To))))
+                    if (DrawArrow(painter, geometry, link))
                     {
                         drawn++;
                     }
@@ -84,12 +84,16 @@ namespace CoveredLot.Client
         }
 
         /// <summary>
-        /// Draws a line from one point towards the other, and an arrowhead whose tip is the other point; returns whether it
-        /// drew one. Two points closer together than an arrowhead's length leave no room for it, and get no arrow.
+        /// Draws the link as the geometry places it: a line from the centre of the tagged vehicle's front cell towards the
+        /// centre of the cell ahead, and an arrowhead whose tip is that centre; returns whether it drew one. The tail and the
+        /// tip are read from the link here, so no call can put one in the other's place. Two centres closer together than an
+        /// arrowhead's length leave no room for it, and get no arrow.
         /// </summary>
-        private bool DrawArrow(Painter2D painter, Vector2 from, Vector2 to)
+        private bool DrawArrow(Painter2D painter, BoardGeometry geometry, AheadLinkPicture link)
         {
-            Vector2 along = to - from;
+            Vector2 tail = PointOf(geometry.CentreOf(link.From));
+            Vector2 tip = PointOf(geometry.CentreOf(link.To));
+            Vector2 along = tip - tail;
             float length = along.magnitude;
             if (length <= _arrowSize)
             {
@@ -97,16 +101,16 @@ namespace CoveredLot.Client
             }
 
             Vector2 direction = along / length;
-            Vector2 headBase = to - (direction * _arrowSize);
+            Vector2 headBase = tip - (direction * _arrowSize);
             Vector2 halfBase = new Vector2(-direction.y, direction.x) * (_arrowSize / 2f);
 
             painter.BeginPath();
-            painter.MoveTo(from);
+            painter.MoveTo(tail);
             painter.LineTo(headBase);
             painter.Stroke();
 
             painter.BeginPath();
-            painter.MoveTo(to);
+            painter.MoveTo(tip);
             painter.LineTo(headBase + halfBase);
             painter.LineTo(headBase - halfBase);
             painter.ClosePath();

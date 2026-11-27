@@ -18,10 +18,11 @@ namespace CoveredLot.Tests.EditMode
     /// <summary>
     /// The play screen, clicked as a player clicks it (design sections 9 and 10.3), in a panel of the UI Test Framework
     /// that no window shows: 360 x 800 units, a phone's panel, with the game's own theme (CoveredLotTheme.tss: Unity's
-    /// default runtime theme, then CoveredLot.uss), under the culture the run names. Each test builds the screens over the
-    /// catalogue that the Client's ResourcesLevelTexts loads, with the Example open, as GameRoot does, and lets the panel
-    /// update after every click. The Example's tiles stand in PieceId order in the tile layer, and its ghosts in the ghost
-    /// layer, so tile n is vehicle n's. The counts are asserted, so no check passes on an empty list.
+    /// default runtime theme, then CoveredLot.uss), under the culture the run names. Each test but the variant's builds the
+    /// screens over the catalogue that the Client's ResourcesLevelTexts loads, with the Example open, as GameRoot does, and
+    /// lets the panel update after every click. The Example's tiles stand in PieceId order in the tile layer, and its ghosts
+    /// in the ghost layer, so tile n is vehicle n's; Level 1, which the win card's Next level opens, has nine vehicles too.
+    /// The counts are asserted, so no check passes on an empty list.
     /// </summary>
     [HostileCulture]
     public sealed class PlayScreenTests : UITestFixture
@@ -51,9 +52,19 @@ namespace CoveredLot.Tests.EditMode
         /// <summary>The ink of CoveredLot.uss, --cl-ink, which the lines and headings show.</summary>
         private const string InkColour = "#1D1D1D";
 
+        /// <summary>The page colour of CoveredLot.uss, --cl-page, which fills the end card.</summary>
+        private const string PageColour = "#F4F1EA";
+
+        /// <summary>A bay with neither a letter nor a swatch, as BaysOf describes it.</summary>
+        private const string EmptyBay = "empty";
+
+        /// <summary>Level 1's vehicle 3, the yellow one at the left end of row 2, which faces west and drives straight out.</summary>
+        private const int LevelOneLeaver = 3;
+
         private static readonly Vector2 PhonePanel = new Vector2(360, 800);
         private static readonly int[] WinningLine = { 0, 3, 4, 2, 8, 5, 1, 6, 7 };
         private static readonly int[] FailingLine = { 0, 3, 1, 8 };
+        private static readonly Swatch[] Swatches = (Swatch[])System.Enum.GetValues(typeof(Swatch));
 
         /// <summary>The classes of the labels in the ink colour: the title, the status line, the HUD's lines, the headings, the pills and the tags.</summary>
         private static readonly string[] InkClasses =
@@ -83,13 +94,15 @@ namespace CoveredLot.Tests.EditMode
             ScreenHost host = ShowExample();
 
             Click(host, 5);
-            IReadOnlyList<int> outlined = TilesWithClass(host, StyleNames.Blocker);
+            List<VisualElement> outlined = Everything(host, StyleNames.Blocker);
+            VisualElement four = TileOf(host, 4);
             string status = StatusOf(host);
             Click(host, 0);
 
-            Assert.That(outlined, Is.EqualTo(new[] { 4 }), "the tiles outlined as the blocker after tapping vehicle 5");
+            Assert.That(outlined, Is.EqualTo(new[] { four }), "the elements outlined as the blocker after tapping vehicle 5: tile 4's alone");
             Assert.That(status, Is.EqualTo("Something is in its way."), "the status line after the bump");
             Assert.That(Everything(host, StyleNames.Blocker), Is.Empty, "the elements outlined as a blocker after the next tap, vehicle 0's");
+            Assert.That(StatusOf(host), Is.Empty, "the status line after the next tap, vehicle 0's, which lifts no cover and clears no set");
         }
 
         [Test]
@@ -105,11 +118,44 @@ namespace CoveredLot.Tests.EditMode
             Assert.That(ShownTiles(host), Is.Empty, "the tiles shown after the win");
         }
 
-        /// <summary>A tap under the card would reach the tile only if a click at its centre picked the tile, not the card.</summary>
+        /// <summary>
+        /// Level 1, which the win card's Next level opens, is a plain level: a 5x5 lot of nine vehicles with 5 bays, no
+        /// covers and no tags. The play screen grows its bays row from the Example's 4 to 5 and shows no ledger, no tags
+        /// list, no badge and no covered tile; vehicle 3, which leaves first, leaves no ghost behind.
+        /// </summary>
         [Test]
-        public void The_taps_0_3_1_8_show_the_fail_card_over_the_lot_so_a_click_on_a_tile_left_reaches_the_card()
+        public void Next_level_after_the_win_opens_Level_1_a_plain_level_with_5_bays_and_no_ledger_tags_badge_cover_or_ghost()
         {
             ScreenHost host = ShowExample();
+            ClickAll(host, WinningLine);
+
+            ClickButton(host, Copy.NextLevel);
+            List<string> title = ShownTexts(host, StyleNames.Title);
+            int tilesAtTheStart = ShownTiles(host).Count;
+            Click(host, LevelOneLeaver);
+
+            Assert.That(title, Is.EqualTo(new[] { "Level 1" }), "the title after Next level");
+            Assert.That(tilesAtTheStart, Is.EqualTo(9), "the tiles shown at Level 1's start");
+            Assert.That(ShownTiles(host).Count, Is.EqualTo(8), "the tiles shown after vehicle 3 has left");
+            Assert.That(BaysOf(host), Is.EqualTo(new[] { Filled("Y", Swatch.Yellow), EmptyBay, EmptyBay, EmptyBay, EmptyBay }), "Level 1's bays after vehicle 3 has left");
+            Assert.That(ShownTexts(host, StyleNames.HudLine), Is.EqualTo(new[] { "4 bays free", "Most bays used: 1 (par 3)" }), "Level 1's HUD lines after vehicle 3 has left");
+            Assert.That(ShownElements.WithClass(host, StyleNames.Ledger), Is.Empty, "the ledgers shown on a plain level");
+            Assert.That(ShownElements.WithClass(host, StyleNames.Tags), Is.Empty, "the tags lists shown on a plain level");
+            Assert.That(ShownElements.WithClass(host, StyleNames.Badge), Is.Empty, "the badges shown on a plain level");
+            Assert.That(Everything(host, StyleNames.Covered), Is.Empty, "the covered tiles on a plain level, shown or not");
+            Assert.That(ShownElements.WithClass(host, StyleNames.Ghost), Is.Empty, "the ghosts shown on a plain level after vehicle 3 has left");
+            Assert.That(ShownElements.WithClass(host, StyleNames.Card), Is.Empty, "the end cards shown after Next level");
+        }
+
+        /// <summary>
+        /// The card is filled with the page colour at full alpha, so nothing under it shows through. A tap under the card
+        /// would reach the tile only if a click at its centre picked the tile, not the card.
+        /// </summary>
+        [Test]
+        public void The_taps_0_3_1_8_show_the_opaque_fail_card_over_the_lot_so_a_click_on_a_tile_left_reaches_the_card()
+        {
+            ScreenHost host = ShowExample();
+            Color page = ColourOf(PageColour);
 
             ClickAll(host, FailingLine);
             VisualElement card = TheShownCard(host);
@@ -128,17 +174,28 @@ namespace CoveredLot.Tests.EditMode
             Assert.That(ShownElements.ButtonTexts(card), Is.EqualTo(new[] { Copy.Retry, Copy.Levels }), "the fail card's buttons");
             Assert.That(tiles.Count, Is.EqualTo(5), "the tiles left under the card: vehicles 2, 4, 5, 6 and 7");
             Assert.That(pickedPastTheCard, Is.Empty, "the tiles a click at their centre reaches past the card");
+            Assert.That(ColourText(card.resolvedStyle.backgroundColor), Is.EqualTo(ColourText(page)), "the fail card's fill: the page colour " + PageColour + " at full alpha");
         }
 
+        /// <summary>
+        /// The play screen keeps its bays and HUD lines from one session to the next and repaints them, so the full bays of
+        /// the fail must not outlive it: before Retry they hold B, B, R and Y, after it they are empty again.
+        /// </summary>
         [Test]
-        public void After_the_fail_Retry_shows_nine_tiles_tile_3_covered_as_q_v_the_ledger_R_1_B_1_Y_0_and_no_blocker()
+        public void After_the_fail_Retry_shows_nine_tiles_tile_3_covered_as_q_v_the_ledger_R_1_B_1_Y_0_four_empty_bays_and_no_blocker()
         {
             ScreenHost host = ShowExample();
             ClickAll(host, FailingLine);
+            List<string> baysBeforeRetry = BaysOf(host);
+            List<string> hudBeforeRetry = ShownTexts(host, StyleNames.HudLine);
 
             ClickButton(host, Copy.Retry);
             VisualElement three = TileOf(host, 3);
 
+            Assert.That(baysBeforeRetry, Is.EqualTo(new[] { Filled("B", Swatch.Blue), Filled("B", Swatch.Blue), Filled("R", Swatch.Red), Filled("Y", Swatch.Yellow) }), "the bays before Retry");
+            Assert.That(hudBeforeRetry, Is.EqualTo(new[] { "0 bays free", "Most bays used: 4 (par 3)" }), "the HUD's lines before Retry");
+            Assert.That(BaysOf(host), Is.EqualTo(new[] { EmptyBay, EmptyBay, EmptyBay, EmptyBay }), "the bays after Retry");
+            Assert.That(ShownTexts(host, StyleNames.HudLine), Is.EqualTo(new[] { "4 bays free", "Most bays used: 0 (par 3)" }), "the HUD's lines after Retry");
             Assert.That(ShownTiles(host).Count, Is.EqualTo(ExampleVehicles), "the tiles shown after Retry");
             Assert.That(three.ClassListContains(StyleNames.Covered), Is.True, "whether tile 3 is shown covered after Retry");
             Assert.That(LabelOf(three), Is.EqualTo("?v"), "tile 3's label after Retry");
@@ -243,10 +300,7 @@ namespace CoveredLot.Tests.EditMode
         public void The_title_status_HUD_lines_headings_pills_and_tags_show_the_ink_of_CoveredLot_uss()
         {
             ScreenHost host = ShowExample();
-            if (!ColorUtility.TryParseHtmlString(InkColour, out Color ink))
-            {
-                throw new AssertionException(InkColour + " is no colour.");
-            }
+            Color ink = ColourOf(InkColour);
 
             var inked = new List<Label>();
             foreach (Label label in ShownElements.OfType<Label>(host))
@@ -290,6 +344,10 @@ namespace CoveredLot.Tests.EditMode
             Color32 other = expected;
             return one.r == other.r && one.g == other.g && one.b == other.b && one.a == other.a;
         }
+
+        /// <summary>The colour the hex text names; a constant that names no colour fails the test here.</summary>
+        private static Color ColourOf(string html) =>
+            ColorUtility.TryParseHtmlString(html, out Color colour) ? colour : throw new AssertionException(html + " is no colour.");
 
         private static string ColourText(Color colour)
         {
@@ -417,6 +475,41 @@ namespace CoveredLot.Tests.EditMode
             Assert.That(cards.Count, Is.EqualTo(1), "the end cards shown");
             return cards[0];
         }
+
+        /// <summary>
+        /// Each bay of the bays row, in order: one that shows a letter or a swatch as its letter, then its swatch classes,
+        /// as Filled writes it, and one that shows neither as EmptyBay. A bay that kept a letter or a swatch from a colour
+        /// that has left it shows that here.
+        /// </summary>
+        private static List<string> BaysOf(ScreenHost host)
+        {
+            var bays = new List<string>();
+            foreach (VisualElement bay in ShownElements.WithClass(host, StyleNames.Bay))
+            {
+                List<Label> letters = bay.Query<Label>(className: StyleNames.BayLetter).ToList();
+                Assert.That(letters.Count, Is.EqualTo(1), "the letters of a bay");
+                var shown = new List<string>();
+                if (letters[0].text.Length > 0)
+                {
+                    shown.Add(letters[0].text);
+                }
+
+                foreach (Swatch swatch in Swatches)
+                {
+                    if (bay.ClassListContains(StyleNames.Of(swatch)))
+                    {
+                        shown.Add(StyleNames.Of(swatch));
+                    }
+                }
+
+                bays.Add(shown.Count == 0 ? EmptyBay : string.Join(" ", shown));
+            }
+
+            return bays;
+        }
+
+        /// <summary>A filled bay as BaysOf describes it: its letter, then its swatch's class.</summary>
+        private static string Filled(string letter, Swatch swatch) => letter + " " + StyleNames.Of(swatch);
 
         private static string StatusOf(ScreenHost host)
         {
