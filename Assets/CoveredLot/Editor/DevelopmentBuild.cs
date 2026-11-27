@@ -13,7 +13,8 @@ namespace CoveredLot.EditorTools
     /// keystore. tools/build-android.sh runs it with <c>unity build --execute-method
     /// CoveredLot.EditorTools.DevelopmentBuild.Android --output-path &lt;apk&gt;</c>: the CLI forwards the output path as
     /// <c>-buildOutput</c> and returns this method's exit code. The editor exits with 1 when the path or the scenes are
-    /// missing, or when the build does not succeed.
+    /// missing, or when the build does not succeed. The build runs in strict mode, because without it a build that reports
+    /// errors (a shader that fails to compile, a missing script) can still end as Succeeded.
     /// </summary>
     public static class DevelopmentBuild
     {
@@ -24,14 +25,14 @@ namespace CoveredLot.EditorTools
             string? apkPath = BuildOutputOf(Environment.GetCommandLineArgs());
             if (apkPath == null)
             {
-                Fail("no " + BuildOutputArgument + " path was given; run tools/build-android.sh");
+                ExitWithFailure("no " + BuildOutputArgument + " path was given; run tools/build-android.sh");
                 return;
             }
 
             string[] scenes = EditorBuildSettings.globalScenes.Where(scene => scene.enabled).Select(scene => scene.path).ToArray();
             if (scenes.Length == 0)
             {
-                Fail("the build holds no enabled scene; run ProjectSetup.Apply");
+                ExitWithFailure("the build holds no enabled scene; run ProjectSetup.Apply");
                 return;
             }
 
@@ -43,17 +44,13 @@ namespace CoveredLot.EditorTools
                 locationPathName = apkPath,
                 target = BuildTarget.Android,
                 targetGroup = BuildTargetGroup.Android,
-                options = BuildOptions.Development,
+                options = BuildOptions.Development | BuildOptions.StrictMode,
             });
 
-            BuildSummary summary = report.summary;
-            Debug.Log("DevelopmentBuild: " + summary.result.ToString() + ", "
-                + summary.totalErrors.ToString(CultureInfo.InvariantCulture) + " errors, "
-                + summary.totalWarnings.ToString(CultureInfo.InvariantCulture) + " warnings, "
-                + summary.totalSize.ToString(CultureInfo.InvariantCulture) + " bytes, " + summary.outputPath);
-            if (summary.result != BuildResult.Succeeded)
+            Debug.Log("DevelopmentBuild: " + SummaryLine(report.summary));
+            if (report.summary.result != BuildResult.Succeeded)
             {
-                Fail("the build did not succeed");
+                ExitWithFailure("the build did not succeed");
             }
         }
 
@@ -64,7 +61,15 @@ namespace CoveredLot.EditorTools
             return index >= 0 && index + 1 < arguments.Length ? arguments[index + 1] : null;
         }
 
-        private static void Fail(string reason)
+        /// <summary>The result, the error and warning counts, the size in bytes and the output path.</summary>
+        private static string SummaryLine(BuildSummary summary) =>
+            summary.result.ToString() + ", "
+            + summary.totalErrors.ToString(CultureInfo.InvariantCulture) + " errors, "
+            + summary.totalWarnings.ToString(CultureInfo.InvariantCulture) + " warnings, "
+            + summary.totalSize.ToString(CultureInfo.InvariantCulture) + " bytes, " + summary.outputPath;
+
+        /// <summary>Logs the reason and ends the editor with exit code 1, which the CLI returns.</summary>
+        private static void ExitWithFailure(string reason)
         {
             Debug.LogError("DevelopmentBuild: " + reason + ".");
             EditorApplication.Exit(1);

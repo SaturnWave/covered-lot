@@ -8,10 +8,14 @@
 # the APK (Builds/ is ignored). The CLI's own output goes to artifacts/local/build/android.cli.txt. The script fails when:
 #   - the CLI ends with an exit code other than 0;
 #   - the APK is missing;
-#   - the editor log holds a compiler error or warning (error CS or warning CS) for a file under Assets/CoveredLot.
+#   - the editor log holds a compiler error or warning (error CS or warning CS) for a file under Assets/CoveredLot. The
+#     log holds only what this build compiled: when Bee serves the player's scripts from its cache, the log shows no
+#     compile and this check has nothing to read; csc.rsp's -warnaserror+ stays the guard;
+#   - the build changed what git sees: Unity writes some settings on a target's first build, and the CLI's guard would
+#     refuse the next build until they are committed or reverted.
 # It refuses to start while Temp/UnityLockfile exists. Unity's Gradle and Bee caches follow GRADLE_USER_HOME and
-# BEE_CACHE_DIRECTORY in the environment the editor starts with, so the script prints both. It builds the repository it
-# belongs to, from whatever folder it is started.
+# BEE_CACHE_DIRECTORY in the environment the editor starts with (piece 12 checked both by path), so the script prints
+# both. It builds the repository it belongs to, from whatever folder it is started.
 #
 # Usage: tools/build-android.sh [--allow-dirty-build]
 # Exit codes: 0 when the APK was built cleanly; 1 when the build or a check failed; 2 when Temp/UnityLockfile exists or
@@ -24,8 +28,8 @@ readonly BUILD_DIR=artifacts/local/build
 readonly LOG=$BUILD_DIR/android.log
 readonly CLI_OUTPUT=$BUILD_DIR/android.cli.txt
 readonly LOCK_FILE=Temp/UnityLockfile
-# The first IL2CPP build compiles the engine's code for ARM64 and fills the Gradle cache, which takes much longer than
-# the builds after it.
+# The first IL2CPP build compiles the engine's code for ARM64 and fills the Gradle cache: 29 minutes on this project's
+# first build, against a timeout of an hour.
 readonly TIMEOUT_SECONDS=3600
 readonly METHOD=CoveredLot.EditorTools.DevelopmentBuild.Android
 
@@ -48,13 +52,15 @@ if [ -e "$LOCK_FILE" ]; then
   exit 2
 fi
 
-echo "build-android: GRADLE_USER_HOME=${GRADLE_USER_HOME:-<unset: Unity's Gradle home>}"
-echo "build-android: BEE_CACHE_DIRECTORY=${BEE_CACHE_DIRECTORY:-<unset: Unity's default Bee cache>}"
+# No apostrophe may stand in these defaults: inside a double-quoted expansion, bash reads one as a quote.
+echo "build-android: GRADLE_USER_HOME=${GRADLE_USER_HOME:-<unset: the default Gradle home>}"
+echo "build-android: BEE_CACHE_DIRECTORY=${BEE_CACHE_DIRECTORY:-<unset: the default Bee cache>}"
 
 # The editor wants absolute paths. Git Bash's pwd -W gives the Windows form; elsewhere pwd is the absolute path.
 repo_root="$(pwd -W 2>/dev/null || pwd)"
 mkdir -p "$BUILD_DIR" "$(dirname "$APK")"
 rm -f "$APK" "$LOG" "$CLI_OUTPUT"
+status_before="$(git status --porcelain=v1 --untracked-files=all)"
 
 started=$SECONDS
 status=0
@@ -76,13 +82,20 @@ if [ ! -f "$LOG" ]; then
   echo "build-android: the editor wrote no log at $LOG" >&2
   failures=1
 else
-  # Unity writes compiler paths with backslashes or with slashes.
-  compiler_lines="$(grep -E '(error|warning) CS[0-9]+' "$LOG" | grep -E 'Assets[\\/]CoveredLot[\\/]' || true)"
+  # Unity writes compiler paths with backslashes or with slashes. -a reads the log as text even if it holds a NUL byte,
+  # which would make grep print only "Binary file matches".
+  compiler_lines="$(grep -a -E '(error|warning) CS[0-9]+' "$LOG" | grep -a -E 'Assets[\\/]CoveredLot[\\/]' || true)"
   if [ -n "$compiler_lines" ]; then
     echo "build-android: the compiler reported on our code:" >&2
     echo "$compiler_lines" >&2
     failures=1
   fi
+fi
+status_after="$(git status --porcelain=v1 --untracked-files=all)"
+if [ "$status_after" != "$status_before" ]; then
+  echo "build-android: the build changed what git sees; commit or revert these before the next build:" >&2
+  echo "$status_after" >&2
+  failures=1
 fi
 
 if [ "$failures" -ne 0 ]; then
