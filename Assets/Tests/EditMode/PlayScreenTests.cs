@@ -264,6 +264,26 @@ namespace CoveredLot.Tests.EditMode
             Assert.That(WithinTheSides(heading.worldBound, card.worldBound) && WithinTheSides(line.worldBound, card.worldBound), Is.True, "whether the heading and the line keep within the card's sides");
         }
 
+        /// <summary>
+        /// Piece 13's review: the full bays' rule, about 333 units wide on piece 13's phone, keeps to one line of the fail
+        /// card on a phone's panel, because the card's lines keep the lot frame's 8-unit side margins and so have 344 units.
+        /// The rule's text is measured in its line's width against one word's.
+        /// </summary>
+        [Test]
+        public void The_full_bays_rule_keeps_to_one_line_of_the_fail_card()
+        {
+            ScreenHost host = ShowExample();
+            ClickAll(host, FailingLine);
+            Label line = TheShownCard(host).Q<Label>(className: StyleNames.CardLine);
+            float width = line.contentRect.width;
+
+            Vector2 rule = line.MeasureTextSize(line.text, width, VisualElement.MeasureMode.AtMost, 0, VisualElement.MeasureMode.Undefined);
+            Vector2 word = line.MeasureTextSize("Bays", width, VisualElement.MeasureMode.AtMost, 0, VisualElement.MeasureMode.Undefined);
+
+            Assert.That(line.text, Is.EqualTo("Three of one colour leave the bays together."), "the premise: the fail card's line");
+            Assert.That(rule.y, Is.EqualTo(word.y).Within(0.5f), "the height of the rule's text, " + Size(rule.x) + " units wide in its line's " + Size(width) + ", against one word's");
+        }
+
         /// <summary>The win card offers Next level only while another entry follows: a catalogue of the Example alone has none after it.</summary>
         [Test]
         public void The_win_card_of_the_last_entry_offers_no_Next_level()

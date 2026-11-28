@@ -83,11 +83,14 @@
   border-radius: 8px;
 }
 
-.cl-button:hover {
+/* A button keeps its fill under the pointer and shows the pressed fill while it is pressed. Unity's theme writes its
+   own hover and press fills with :enabled, so these rules do too: at the same specificity, this sheet wins, because
+   CoveredLotTheme.tss imports it after Unity's theme (piece 13's review found the theme's greys on a button). */
+.cl-button:hover:enabled {
   background-color: var(--cl-button);
 }
 
-.cl-button:active {
+.cl-button:active:enabled {
   background-color: var(--cl-button-pressed);
 }
 
@@ -495,8 +498,10 @@
 /* The vertical bar of the list's and the rules' scrolls. Unity's runtime theme draws it 24 units wide beside what
    scrolls, with arrow buttons and a grey track, which on piece 13's phone pushed the list's buttons 12 units left of the
    title. Here it lies over the scroll's right edge as a 4-unit rounded thumb, with no arrows and no track, so what
-   scrolls keeps the scroll's whole width. Unity sets when the bar shows, and the thumb's height and place. The thumb
-   keeps its fill while it is touched, where the theme lightens it to the page colour. */
+   scrolls keeps the scroll's whole width. Unity sets when the bar shows, and the thumb's height and place; the thumb
+   keeps at least 24 units, however many entries the list holds (on a display as short as the Fold's inner screen,
+   99 entries would leave it about 5). The track stays clear and the thumb keeps its fill while they are touched, where
+   the theme greys the track and lightens the thumb. */
 .cl-level-scroll .unity-scroll-view__vertical-scroller,
 .cl-rules-scroll .unity-scroll-view__vertical-scroller {
   position: absolute;
@@ -521,7 +526,11 @@
 }
 
 .cl-level-scroll .unity-base-slider__tracker,
-.cl-rules-scroll .unity-base-slider__tracker {
+.cl-level-scroll .unity-base-slider__tracker:hover:enabled,
+.cl-level-scroll .unity-base-slider__tracker:active:enabled,
+.cl-rules-scroll .unity-base-slider__tracker,
+.cl-rules-scroll .unity-base-slider__tracker:hover:enabled,
+.cl-rules-scroll .unity-base-slider__tracker:active:enabled {
   border-width: 0;
   background-color: rgba(0, 0, 0, 0);
 }
@@ -534,6 +543,7 @@
 .cl-rules-scroll .unity-base-slider__dragger:active:enabled {
   left: 0;
   width: 4px;
+  min-height: 24px;
   margin: 0;
   border-width: 0;
   border-radius: 2px;

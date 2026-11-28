@@ -43,6 +43,9 @@ namespace CoveredLot.Tests.EditMode
         /// <summary>The width of the scrolls' bar in CoveredLot.uss.</summary>
         private const float ScrollBarWidth = 4f;
 
+        /// <summary>The least length of the scrolls' thumb in CoveredLot.uss, however many entries the list holds.</summary>
+        private const float ThumbLeastLength = 24f;
+
         /// <summary>How far apart two centres or edges may lie and count as one: the panel lays each edge out on its pixel grid.</summary>
         private const float SameSpot = 0.5f;
 
@@ -53,6 +56,11 @@ namespace CoveredLot.Tests.EditMode
 
         /// <summary>The fill of the scrolls' thumb: CoveredLot.uss's --cl-scroll-thumb, #8F887A.</summary>
         private static readonly Color32 ScrollThumb = new Color32(0x8F, 0x88, 0x7A, 0xFF);
+
+        /// <summary>A button's fill, CoveredLot.uss's --cl-button, #E2DCCF, and its fill while pressed, --cl-button-pressed, #CFC8B8.</summary>
+        private static readonly Color32 ButtonFill = new Color32(0xE2, 0xDC, 0xCF, 0xFF);
+
+        private static readonly Color32 PressedButtonFill = new Color32(0xCF, 0xC8, 0xB8, 0xFF);
 
         /// <summary>Loading the theme is no culture-sensitive work, so it may run here, outside [HostileCulture].</summary>
         [OneTimeSetUp]
@@ -282,14 +290,93 @@ namespace CoveredLot.Tests.EditMode
         }
 
         /// <summary>
-        /// The scroll's vertical bar shows, as what it holds is taller than it: a strip as wide as CoveredLot.uss makes it, on
-        /// the scroll's right edge and over what scrolls, which keeps the scroll's whole width; no arrow button and no track,
-        /// and a thumb in --cl-scroll-thumb inside the strip and shorter than it.
+        /// Piece 13's review: the thumb's length is the share of the entries in view, so on a display as short as the inner
+        /// screen the 99 entries alone would leave a thumb about 6 units long, and more levels a shorter one. It keeps at
+        /// least 24 units.
+        /// </summary>
+        [Test]
+        public void On_a_display_as_short_as_the_inner_screen_the_list_s_thumb_keeps_at_least_24_units()
+        {
+            panelSize = InnerScreenPanel;
+            ScreenHost host = ShowShippedCatalogue(BuildKind.Development);
+
+            AssertAThinBarOnTheRightEdge(TheShownScroll(host, StyleNames.LevelScroll), "the list's");
+        }
+
+        /// <summary>
+        /// Piece 13's review: Unity's theme greys a slider's track, and lightens its thumb, while the pointer is over them or
+        /// presses them. On the list's bar the track stays clear and the thumb keeps its fill, so a finger on the bar does
+        /// not hide the thumb. A press on the track pages the list, so the thumb is found again before it is pressed.
+        /// </summary>
+        [Test]
+        public void A_pointer_over_or_pressing_the_list_s_bar_keeps_its_track_clear_and_its_thumb_s_fill()
+        {
+            ScreenHost host = ShowShippedCatalogue(BuildKind.Development);
+            Scroller bar = TheShownScroll(host, StyleNames.LevelScroll).verticalScroller;
+            VisualElement track = bar.Q(className: BaseSlider<float>.trackerUssClassName);
+            VisualElement thumb = bar.Q(className: BaseSlider<float>.draggerUssClassName);
+            var seen = new List<string>();
+
+            var onTheTrack = new Vector2(bar.worldBound.center.x, thumb.worldBound.yMax + ThumbLeastLength);
+            simulate.MouseMove(onTheTrack);
+            Settle();
+            seen.Add(BarFills("over the track", track, thumb));
+            simulate.MouseDown(onTheTrack);
+            Settle();
+            seen.Add(BarFills("pressing the track", track, thumb));
+            simulate.MouseUp(onTheTrack);
+            Settle();
+            Vector2 onTheThumb = thumb.worldBound.center;
+            simulate.MouseMove(onTheThumb);
+            Settle();
+            seen.Add(BarFills("over the thumb", track, thumb));
+            simulate.MouseDown(onTheThumb);
+            Settle();
+            seen.Add(BarFills("pressing the thumb", track, thumb));
+            simulate.MouseUp(onTheThumb);
+            Settle();
+
+            string clear = ": track " + ColourText(new Color32(0, 0, 0, 0)) + ", thumb " + ColourText(ScrollThumb);
+            Assert.That(seen, Is.EqualTo(new[] { "over the track" + clear, "pressing the track" + clear, "over the thumb" + clear, "pressing the thumb" + clear }),
+                "the fills of the list's track and thumb");
+        }
+
+        /// <summary>
+        /// Piece 13's review: Unity's theme fills a button of its own while the pointer is over it or presses it, and its
+        /// rules outranked CoveredLot.uss's, so a pressed button showed the theme's grey. A button keeps --cl-button under
+        /// the pointer and shows --cl-button-pressed while it is pressed.
+        /// </summary>
+        [Test]
+        public void A_button_keeps_its_fill_under_the_pointer_and_shows_the_pressed_fill_while_pressed()
+        {
+            ScreenHost host = ShowShippedCatalogue(BuildKind.Development);
+            Button rules = TheShownButton(host, Copy.RulesButton);
+            Vector2 centre = rules.worldBound.center;
+            var fills = new List<Color32> { rules.resolvedStyle.backgroundColor };
+
+            simulate.MouseMove(centre);
+            Settle();
+            fills.Add(rules.resolvedStyle.backgroundColor);
+            simulate.MouseDown(centre);
+            Settle();
+            fills.Add(rules.resolvedStyle.backgroundColor);
+            simulate.MouseUp(centre);
+            Settle();
+
+            Assert.That(fills, Is.EqualTo(new[] { ButtonFill, ButtonFill, PressedButtonFill }), "the Rules button's fill at rest, under the pointer and pressed");
+        }
+
+        /// <summary>
+        /// The scroll's vertical bar shows, as what it holds is taller than it, and the scroll is at its start: a strip as
+        /// wide as CoveredLot.uss makes it, on the scroll's right edge and over what scrolls, which keeps the scroll's whole
+        /// width; no arrow button, and a track that is clear and has no border; a slider that fills the strip, and in it a
+        /// thumb in --cl-scroll-thumb at the strip's top, at least the thumb's least length and shorter than the strip.
         /// </summary>
         private static void AssertAThinBarOnTheRightEdge(ScrollView scroll, string whose)
         {
             Scroller bar = scroll.verticalScroller;
             Rect strip = bar.worldBound;
+            Rect slider = bar.slider.worldBound;
             VisualElement track = bar.Q(className: BaseSlider<float>.trackerUssClassName);
             VisualElement thumb = bar.Q(className: BaseSlider<float>.draggerUssClassName);
             Rect drawn = thumb.worldBound;
@@ -300,12 +387,32 @@ namespace CoveredLot.Tests.EditMode
             Assert.That(scroll.contentViewport.worldBound.width, Is.EqualTo(scroll.worldBound.width).Within(SameSpot), "the width " + whose + " scroll leaves what scrolls, against its own");
             Assert.That(ShownElements.IsShown(bar.lowButton) || ShownElements.IsShown(bar.highButton), Is.False, "whether " + whose + " bar shows an arrow button");
             Assert.That(((Color32)track.resolvedStyle.backgroundColor).a, Is.EqualTo(0), "the alpha of " + whose + " bar's track");
+            Assert.That(BorderWidths(track), Is.EqualTo(0f), "the border widths of " + whose + " bar's track");
+            Assert.That(SameBounds(slider, strip), Is.True, whose + " bar's slider, " + BoundsText(slider) + ", against the strip, " + BoundsText(strip));
             Assert.That(thumb.resolvedStyle.visibility, Is.EqualTo(Visibility.Visible), "the visibility of " + whose + " thumb");
             Assert.That(drawn.xMin >= strip.xMin - SameSpot && drawn.xMax <= strip.xMax + SameSpot, Is.True,
                 whose + " thumb's sides, " + Size(drawn.xMin) + " to " + Size(drawn.xMax) + ", within the strip's, " + Size(strip.xMin) + " to " + Size(strip.xMax));
-            Assert.That(drawn.height, Is.GreaterThan(0f).And.LessThan(strip.height), whose + " thumb's height, against the strip's " + Size(strip.height));
+            Assert.That(drawn.yMin, Is.EqualTo(strip.yMin).Within(SameSpot), whose + " thumb's top with the scroll at its start, against the strip's");
+            Assert.That(drawn.height, Is.GreaterThanOrEqualTo(ThumbLeastLength).And.LessThan(strip.height), whose + " thumb's length, against the strip's " + Size(strip.height));
             Assert.That((Color32)thumb.resolvedStyle.backgroundColor, Is.EqualTo(ScrollThumb), whose + " thumb's fill");
         }
+
+        /// <summary>The track's and the thumb's fills at one moment of the pointer test: "over the track: track RGBA(...), thumb RGBA(...)".</summary>
+        private static string BarFills(string moment, VisualElement track, VisualElement thumb) =>
+            moment + ": track " + ColourText(track.resolvedStyle.backgroundColor) + ", thumb " + ColourText(thumb.resolvedStyle.backgroundColor);
+
+        private static float BorderWidths(VisualElement element) =>
+            element.resolvedStyle.borderLeftWidth + element.resolvedStyle.borderRightWidth + element.resolvedStyle.borderTopWidth + element.resolvedStyle.borderBottomWidth;
+
+        /// <summary>Whether the two rectangles' edges lie within SameSpot of each other.</summary>
+        private static bool SameBounds(Rect one, Rect other) =>
+            Mathf.Abs(one.xMin - other.xMin) <= SameSpot && Mathf.Abs(one.xMax - other.xMax) <= SameSpot
+            && Mathf.Abs(one.yMin - other.yMin) <= SameSpot && Mathf.Abs(one.yMax - other.yMax) <= SameSpot;
+
+        private static string BoundsText(Rect bounds) => "x " + Size(bounds.xMin) + " to " + Size(bounds.xMax) + ", y " + Size(bounds.yMin) + " to " + Size(bounds.yMax);
+
+        private static string ColourText(Color32 colour) =>
+            "RGBA(" + Number(colour.r) + ", " + Number(colour.g) + ", " + Number(colour.b) + ", " + Number(colour.a) + ")";
 
         private static string Number(int value) => value.ToString(CultureInfo.InvariantCulture);
 
