@@ -210,6 +210,57 @@ namespace CoveredLot.Tests.EditMode
             Assert.That(host.Play.Board.worldBound.yMin, Is.EqualTo(lotTop), "the top of the lot's frame after the bump, against before it");
         }
 
+        /// <summary>
+        /// The longest lines the status line writes, a lifted cover and a cleared set of the longest colour names, fit on
+        /// one line of the panel's 344 units, so the one line the status keeps holds them and the lot stays put. They are
+        /// set on the label itself: no shipped level gives both events in those colours at a known tap.
+        /// </summary>
+        [Test]
+        public void The_longest_status_lines_keep_to_one_line_so_the_lot_does_not_move()
+        {
+            ScreenHost host = ShowExample();
+            float lotTop = host.Play.Board.worldBound.yMin;
+            Label status = host.Q<Label>(className: StyleNames.Status);
+            var tops = new List<float>();
+
+            foreach (string line in new[] { "Cover lifted: orange. Three orange cleared.", "Cover lifted: yellow. Three yellow cleared." })
+            {
+                status.text = line;
+                Settle();
+                tops.Add(host.Play.Board.worldBound.yMin);
+            }
+
+            Assert.That(tops, Is.EqualTo(new[] { lotTop, lotTop }), "the top of the lot's frame with each of the longest status lines, against with none");
+        }
+
+        /// <summary>The win card offers Next level only while another entry follows: a catalogue of the Example alone has none after it.</summary>
+        [Test]
+        public void The_win_card_of_the_last_entry_offers_no_Next_level()
+        {
+            ScreenHost host = Show(LevelCatalogue.Load(new VariantTexts(ShippedExampleText())));
+
+            ClickAll(host, WinningLine);
+
+            Assert.That(ShownElements.ButtonTexts(TheShownCard(host)), Is.EqualTo(new[] { Copy.PlayAgain, Copy.Levels }), "the win card's buttons when no entry follows");
+        }
+
+        [Test]
+        public void Levels_on_the_win_card_and_on_the_fail_card_returns_to_the_list()
+        {
+            ScreenHost host = ShowExample();
+            ClickAll(host, WinningLine);
+
+            ClickButtonIn(TheShownCard(host), Copy.Levels);
+            int listsAfterTheWin = ShownElements.WithClass(host, StyleNames.LevelList).Count;
+            ClickButton(host, "Example");
+            ClickAll(host, FailingLine);
+            ClickButtonIn(TheShownCard(host), Copy.Levels);
+
+            Assert.That(listsAfterTheWin, Is.EqualTo(1), "the level lists shown after the win card's Levels");
+            Assert.That(ShownElements.WithClass(host, StyleNames.LevelList).Count, Is.EqualTo(1), "the level lists shown after the fail card's Levels");
+            Assert.That(ShownElements.WithClass(host, StyleNames.Play), Is.Empty, "the play screens shown after the fail card's Levels");
+        }
+
         /// <summary>The rules take the play screen's place and give it back as it was: the attempt is not restarted.</summary>
         [Test]
         public void Rules_on_the_top_bar_shows_the_rules_and_Back_brings_the_level_back_as_it_was()
@@ -415,8 +466,8 @@ namespace CoveredLot.Tests.EditMode
 
         private static string CellOf(GridCell cell) => "row " + Number(cell.Row.Value) + ", column " + Number(cell.Column.Value);
 
-        /// <summary>The Example's text from Resources with the variant's tags line in place of its own.</summary>
-        private static string VariantText()
+        /// <summary>The Example's text as Resources holds it.</summary>
+        private static string ShippedExampleText()
         {
             TextAsset? asset = Resources.Load<TextAsset>(ExampleAsset);
             if (asset == null)
@@ -424,16 +475,20 @@ namespace CoveredLot.Tests.EditMode
                 throw new AssertionException("Resources holds no text asset at " + ExampleAsset + ".");
             }
 
-            string shipped;
             try
             {
-                shipped = asset.text;
+                return asset.text;
             }
             finally
             {
                 Resources.UnloadAsset(asset);
             }
+        }
 
+        /// <summary>The Example's text from Resources with the variant's tags line in place of its own.</summary>
+        private static string VariantText()
+        {
+            string shipped = ShippedExampleText();
             if (!shipped.EndsWith("\n" + ExampleTagsLine, System.StringComparison.Ordinal))
             {
                 throw new AssertionException(ExampleAsset + " does not end with the line " + ExampleTagsLine + ".");
@@ -450,7 +505,7 @@ namespace CoveredLot.Tests.EditMode
             var navigator = new Navigator(catalogue);
             navigator.Open(0);
             Assert.That(navigator.Screen, Is.InstanceOf<AppScreen.Playing>(), "the screen after opening the catalogue's first entry");
-            var host = new ScreenHost(navigator, developmentBuild: true);
+            var host = new ScreenHost(navigator, BuildKind.Development);
             rootVisualElement.Add(host);
             Settle();
             return host;
@@ -480,10 +535,11 @@ namespace CoveredLot.Tests.EditMode
             }
         }
 
-        private void ClickButton(ScreenHost host, string text)
+        /// <summary>Clicks the one button shown with the text under the root, such as a card's own Levels button.</summary>
+        private void ClickButtonIn(VisualElement root, string text)
         {
             var buttons = new List<Button>();
-            foreach (Button button in ShownElements.OfType<Button>(host))
+            foreach (Button button in ShownElements.OfType<Button>(root))
             {
                 if (button.text == text)
                 {
@@ -491,10 +547,13 @@ namespace CoveredLot.Tests.EditMode
                 }
             }
 
-            Assert.That(buttons.Count, Is.EqualTo(1), "the buttons shown with the text " + text);
+            Assert.That(buttons.Count, Is.EqualTo(1), "the buttons shown with the text " + text + " under " + string.Join(" ", root.GetClasses()));
             simulate.Click(buttons[0]);
             Settle();
         }
+
+        /// <summary>Clicks the one button shown with the text anywhere on the screens.</summary>
+        private void ClickButton(ScreenHost host, string text) => ClickButtonIn(host, text);
 
         /// <summary>The tile of the vehicle: the tile layer holds one for each of the Example's vehicles, in PieceId order.</summary>
         private static VisualElement TileOf(ScreenHost host, int piece)

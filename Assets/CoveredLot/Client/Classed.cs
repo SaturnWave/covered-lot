@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using CoveredLot.Core.Pictures;
 using UnityEngine.UIElements;
 
@@ -6,7 +7,7 @@ namespace CoveredLot.Client
 {
     /// <summary>
     /// Makes the plain elements the screens are built of, each with its USS class (StyleNames), so the look stays in
-    /// CoveredLot.uss and the code only names classes.
+    /// CoveredLot.uss and the code only names classes; and keeps a row of like elements at the length a picture asks for.
     /// </summary>
     internal static class Classed
     {
@@ -32,6 +33,28 @@ namespace CoveredLot.Client
             var button = new Button(clicked) { text = text };
             button.AddToClassList(StyleNames.Button);
             return button;
+        }
+
+        /// <summary>
+        /// Makes the list, and the container after the children it already holds, have exactly this many elements: new
+        /// ones are made at the end, and the last ones are dropped.
+        /// </summary>
+        public static void Resize<T>(List<T> elements, VisualElement container, int count, Func<T> make)
+            where T : VisualElement
+        {
+            while (elements.Count < count)
+            {
+                T made = make();
+                elements.Add(made);
+                container.Add(made);
+            }
+
+            while (elements.Count > count)
+            {
+                T last = elements[elements.Count - 1];
+                elements.RemoveAt(elements.Count - 1);
+                last.RemoveFromHierarchy();
+            }
         }
     }
 }

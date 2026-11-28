@@ -13,13 +13,13 @@ namespace CoveredLot.Client
     /// </summary>
     public sealed class ProblemView : VisualElement
     {
-        private readonly bool _developmentBuild;
+        private readonly BuildKind _build;
         private readonly List<Label> _lines = new List<Label>();
 
-        /// <param name="developmentBuild">Whether the build is a development build, the only kind that shows the problems' lines.</param>
-        public ProblemView(bool developmentBuild)
+        /// <param name="build">The kind of build: only a development build shows the problems' lines.</param>
+        public ProblemView(BuildKind build)
         {
-            _developmentBuild = developmentBuild;
+            _build = build;
             AddToClassList(StyleNames.Problems);
             Label message = Classed.Label(StyleNames.Message);
             message.text = Copy.LevelsNotLoaded;
@@ -29,20 +29,8 @@ namespace CoveredLot.Client
         /// <summary>Shows a line for each problem in development builds; a release build shows the sentence alone.</summary>
         public void Show(AppScreen.Problems problems)
         {
-            int shown = _developmentBuild ? problems.List.Count : 0;
-            while (_lines.Count < shown)
-            {
-                Label line = Classed.Label(StyleNames.ProblemLine);
-                _lines.Add(line);
-                Add(line);
-            }
-
-            while (_lines.Count > shown)
-            {
-                _lines[_lines.Count - 1].RemoveFromHierarchy();
-                _lines.RemoveAt(_lines.Count - 1);
-            }
-
+            int shown = _build == BuildKind.Development ? problems.List.Count : 0;
+            Classed.Resize(_lines, this, shown, () => Classed.Label(StyleNames.ProblemLine));
             for (int index = 0; index < shown; index++)
             {
                 _lines[index].text = Copy.ProblemLine(problems.List[index]);

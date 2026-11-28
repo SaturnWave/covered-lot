@@ -6,10 +6,11 @@ namespace CoveredLot.Core.Tests
 {
     /// <summary>
     /// The member bans' one reviewed exemption (ReviewedExemptions, design section 10.4): it covers the reads of
-    /// CultureInfo.CurrentCulture and CultureInfo.CurrentUICulture inside the own methods of CoveredLot.Client.DevCultureSwitch,
-    /// and nothing else. The same read in another type, in a type nested in that one or in a type whose name only starts
-    /// the same, and every other banned member in that type, stay refused. UnityChecks shows on Unity's build of the
-    /// Client that the reads the exemption covers are really there.
+    /// CultureInfo.CurrentCulture and CultureInfo.CurrentUICulture inside two methods of CoveredLot.Client.DevCultureSwitch,
+    /// CurrentName and ReadCultures, and nothing else. The same read in another method of that type (its constructor
+    /// included), in a type nested in it, in another type or in a type whose name only starts the same, and every other
+    /// banned member in those two methods, stay refused. UnityChecks pins, on Unity's build of the Client, the exact reads
+    /// the exemption covers.
     /// </summary>
     public sealed class ReviewedExemptionsTests
     {
@@ -17,10 +18,10 @@ namespace CoveredLot.Core.Tests
         private const string CurrentUiCultureRead = "System.Globalization.CultureInfo::get_CurrentUICulture(): culture-dependent text";
 
         [Theory]
-        [InlineData("CoveredLot.Client.DevCultureSwitch::.ctor+IL_0001", CurrentCultureRead)]
-        [InlineData("CoveredLot.Client.DevCultureSwitch::.ctor+IL_000C", CurrentUiCultureRead)]
         [InlineData("CoveredLot.Client.DevCultureSwitch::CurrentName+IL_0000", CurrentCultureRead)]
-        public void The_exemption_covers_the_two_culture_reads_inside_DevCultureSwitch(string location, string reason)
+        [InlineData("CoveredLot.Client.DevCultureSwitch::ReadCultures+IL_0000", CurrentCultureRead)]
+        [InlineData("CoveredLot.Client.DevCultureSwitch::ReadCultures+IL_0005", CurrentUiCultureRead)]
+        public void The_exemption_covers_the_culture_reads_of_CurrentName_and_ReadCultures(string location, string reason)
         {
             var violation = new Violation { Location = location, Reason = reason };
 
@@ -29,13 +30,16 @@ namespace CoveredLot.Core.Tests
         }
 
         [Theory]
+        [InlineData("CoveredLot.Client.DevCultureSwitch::.ctor+IL_0001", CurrentCultureRead)]
+        [InlineData("CoveredLot.Client.DevCultureSwitch::Next+IL_0010", CurrentUiCultureRead)]
+        [InlineData("CoveredLot.Client.DevCultureSwitch::CurrentNameOf+IL_0000", CurrentCultureRead)]
         [InlineData("CoveredLot.Client.ScreenHost::RefreshDevLine+IL_0010", CurrentCultureRead)]
-        [InlineData("CoveredLot.Client.DevCultureSwitch/Nested::Run+IL_0000", CurrentCultureRead)]
-        [InlineData("CoveredLot.Client.DevCultureSwitch+Nested::Run+IL_0000", CurrentUiCultureRead)]
-        [InlineData("CoveredLot.Client.DevCultureSwitchTwo::Run+IL_0000", CurrentCultureRead)]
-        [InlineData("CoveredLot.Editor.DevCultureSwitch::Run+IL_0000", CurrentCultureRead)]
-        [InlineData("CoveredLot.Client.DevCultureSwitch::Next+IL_0004", "System.StringComparer::get_CurrentCulture(): text in a culture's order")]
-        [InlineData("CoveredLot.Client.DevCultureSwitch::Next+IL_0004", "System.Int32::ToString(): culture-dependent text")]
+        [InlineData("CoveredLot.Client.DevCultureSwitch/CultureSet::Apply+IL_0000", CurrentCultureRead)]
+        [InlineData("CoveredLot.Client.DevCultureSwitch+CultureSet::Apply+IL_0000", CurrentUiCultureRead)]
+        [InlineData("CoveredLot.Client.DevCultureSwitchTwo::CurrentName+IL_0000", CurrentCultureRead)]
+        [InlineData("CoveredLot.Editor.DevCultureSwitch::CurrentName+IL_0000", CurrentCultureRead)]
+        [InlineData("CoveredLot.Client.DevCultureSwitch::CurrentName+IL_0004", "System.StringComparer::get_CurrentCulture(): text in a culture's order")]
+        [InlineData("CoveredLot.Client.DevCultureSwitch::ReadCultures+IL_0004", "System.Int32::ToString(): culture-dependent text")]
         [InlineData("type reference System.Random", CurrentCultureRead)]
         public void The_exemption_leaves_every_other_violation_refused(string location, string reason)
         {

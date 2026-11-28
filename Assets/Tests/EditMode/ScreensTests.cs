@@ -60,7 +60,7 @@ namespace CoveredLot.Tests.EditMode
         [Test]
         public void The_list_shows_the_title_Rules_the_culture_button_and_a_button_for_each_entry_the_Example_first()
         {
-            ScreenHost host = ShowShippedCatalogue(developmentBuild: true);
+            ScreenHost host = ShowShippedCatalogue(BuildKind.Development);
             var expected = new List<string> { "Example" };
             for (int level = 1; level <= ListedLevelCount; level++)
             {
@@ -77,18 +77,19 @@ namespace CoveredLot.Tests.EditMode
         [Test]
         public void Level_1_opens_slot_0_and_the_development_line_names_slot_0000()
         {
-            ScreenHost host = ShowShippedCatalogue(developmentBuild: true);
+            ScreenHost host = ShowShippedCatalogue(BuildKind.Development);
 
             ClickButton(host, "Level 1");
 
             Assert.That(ShownTexts(host, StyleNames.Title), Is.EqualTo(new[] { "Level 1", }), "the titles shown after Level 1");
             Assert.That(DevLineOf(host), Does.StartWith("slot 0000 | par "), "the development line in Level 1");
+            Assert.That(DevLineOf(host), Does.Match(@" \| cell [1-9][0-9]*$"), "the development line in Level 1, which ends at the cells' side once the board is laid out");
         }
 
         [Test]
         public void Levels_on_the_top_bar_returns_to_the_list()
         {
-            ScreenHost host = ShowShippedCatalogue(developmentBuild: true);
+            ScreenHost host = ShowShippedCatalogue(BuildKind.Development);
             ClickButton(host, "Example");
             int playScreensInTheLevel = ShownElements.WithClass(host, StyleNames.Play).Count;
 
@@ -103,7 +104,7 @@ namespace CoveredLot.Tests.EditMode
         [Test]
         public void Opening_the_Example_again_after_a_bump_shows_no_blocker_outline()
         {
-            ScreenHost host = ShowShippedCatalogue(developmentBuild: true);
+            ScreenHost host = ShowShippedCatalogue(BuildKind.Development);
             ClickButton(host, "Example");
             ClickTile(host, ExampleBumper);
             int outlinedAfterTheBump = host.Query(className: StyleNames.Blocker).ToList().Count;
@@ -119,7 +120,7 @@ namespace CoveredLot.Tests.EditMode
         [Test]
         public void A_catalogue_that_did_not_load_shows_the_problem_screen_with_a_development_line_for_each_problem()
         {
-            ScreenHost host = Show(LevelCatalogue.Load(new NoLevelTexts()), developmentBuild: true);
+            ScreenHost host = Show(LevelCatalogue.Load(new NoLevelTexts()), BuildKind.Development);
 
             Assert.That(ShownElements.WithClass(host, StyleNames.Problems).Count, Is.EqualTo(1), "the problem screens shown");
             Assert.That(ShownElements.WithClass(host, StyleNames.LevelList), Is.Empty, "the level lists shown");
@@ -131,12 +132,12 @@ namespace CoveredLot.Tests.EditMode
         [Test]
         public void A_release_build_shows_no_development_line_no_culture_button_and_no_problem_lines()
         {
-            ScreenHost list = ShowShippedCatalogue(developmentBuild: false);
+            ScreenHost list = ShowShippedCatalogue(BuildKind.Release);
             List<string> listButtons = OtherButtons(list);
             List<VisualElement> listDevLines = ShownElements.WithClass(list, StyleNames.DevLine);
             list.RemoveFromHierarchy();
 
-            ScreenHost problems = Show(LevelCatalogue.Load(new NoLevelTexts()), developmentBuild: false);
+            ScreenHost problems = Show(LevelCatalogue.Load(new NoLevelTexts()), BuildKind.Release);
 
             Assert.That(listButtons, Is.EqualTo(new[] { Copy.RulesButton }), "the list's buttons other than the entries' in a release build");
             Assert.That(listDevLines, Is.Empty, "the development lines on the list of a release build");
@@ -150,7 +151,7 @@ namespace CoveredLot.Tests.EditMode
         [Test]
         public void The_culture_button_steps_tr_TR_sv_SE_and_the_device_s_culture_and_the_development_line_names_each()
         {
-            ScreenHost host = ShowShippedCatalogue(developmentBuild: true);
+            ScreenHost host = ShowShippedCatalogue(BuildKind.Development);
             string device = CultureInfo.CurrentCulture.Name;
             var buttons = new List<string>();
             var cultures = new List<string>();
@@ -173,10 +174,46 @@ namespace CoveredLot.Tests.EditMode
             Assert.That(lines[2], Does.StartWith(device + " | "), "the development line after the third click");
         }
 
+        /// <summary>
+        /// A device's four cultures need not agree, and its default-thread cultures are often unset. Each of the four comes
+        /// back to its own place, through the device's step and through RestoreCultures, which GameRoot calls at its end.
+        /// [HostileCulture] puts the run's cultures back after the test.
+        /// </summary>
+        [Test]
+        public void The_device_s_step_and_RestoreCultures_put_each_of_four_different_cultures_back_in_its_own_place()
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("tr-TR");
+            CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("sv-SE");
+            CultureInfo.DefaultThreadCurrentCulture = null;
+            CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.GetCultureInfo("de-DE");
+            const string device = "tr-TR sv-SE none de-DE";
+            ScreenHost host = ShowShippedCatalogue(BuildKind.Development);
+
+            for (int step = 0; step < 3; step++)
+            {
+                ClickButton(host, CultureButtonOf(host).text);
+            }
+
+            string afterTheDeviceStep = FourCultures();
+            ClickButton(host, CultureButtonOf(host).text);
+            string afterOneMoreStep = FourCultures();
+            host.RestoreCultures();
+            Settle();
+
+            Assert.That(afterTheDeviceStep, Is.EqualTo(device), "the current, UI, default-thread and default-thread UI cultures after the device's step");
+            Assert.That(afterOneMoreStep, Is.EqualTo("tr-TR tr-TR tr-TR tr-TR"), "the four cultures after the next click");
+            Assert.That(FourCultures(), Is.EqualTo(device), "the four cultures after RestoreCultures");
+            Assert.That(CultureButtonOf(host).text, Is.EqualTo("Culture: device"), "the culture button after RestoreCultures");
+        }
+
+        /// <summary>The current, UI, default-thread and default-thread UI cultures' names, "none" for an unset one.</summary>
+        private static string FourCultures() => string.Join(" ", CultureInfo.CurrentCulture.Name, CultureInfo.CurrentUICulture.Name,
+            NameOf(CultureInfo.DefaultThreadCurrentCulture), NameOf(CultureInfo.DefaultThreadCurrentUICulture));
+
         [Test]
         public void Rules_on_the_list_shows_the_rules_and_Back_returns_to_the_list()
         {
-            ScreenHost host = ShowShippedCatalogue(developmentBuild: true);
+            ScreenHost host = ShowShippedCatalogue(BuildKind.Development);
 
             ClickButton(host, Copy.RulesButton);
             List<string> lines = ShownTexts(host, StyleNames.RulesLine);
@@ -262,12 +299,12 @@ namespace CoveredLot.Tests.EditMode
             return texts;
         }
 
-        private ScreenHost ShowShippedCatalogue(bool developmentBuild) => Show(LevelCatalogue.Load(new ResourcesLevelTexts()), developmentBuild);
+        private ScreenHost ShowShippedCatalogue(BuildKind build) => Show(LevelCatalogue.Load(new ResourcesLevelTexts()), build);
 
         /// <summary>The screens over the catalogue, where GameRoot starts them, in the panel, laid out.</summary>
-        private ScreenHost Show(CatalogueResult catalogue, bool developmentBuild)
+        private ScreenHost Show(CatalogueResult catalogue, BuildKind build)
         {
-            var host = new ScreenHost(new Navigator(catalogue), developmentBuild);
+            var host = new ScreenHost(new Navigator(catalogue), build);
             rootVisualElement.Add(host);
             Settle();
             return host;

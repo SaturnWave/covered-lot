@@ -90,11 +90,12 @@
   background-color: var(--cl-button-pressed);
 }
 
-/* The status line keeps the height of two lines of text, the longest it writes ("Cover lifted: yellow. Three yellow
-   cleared." wraps on a phone), whether it is empty or not, so the lot never moves when text comes or goes. One line
-   measured 25.7 units on piece 12's phone and 28 in the editor's test panel. */
+/* The status line keeps the height of one line of text whether it is empty or not, so the lot never moves when text
+   comes or goes. One line measured 25.7 units on piece 12's phone and 28 in the editor's test panel, and the longest
+   status, "Cover lifted: orange. Three orange cleared.", fits on one line (about 315 of the 344 units). A second line
+   would take height from the lot, which on covered 8x8 levels is short of it already. */
 .cl-status {
-  min-height: 52px;
+  min-height: 30px;
   margin: 2px 8px;
   font-size: 16px;
   -unity-text-align: middle-center;
@@ -466,6 +467,11 @@
 .cl-rules > .cl-title {
   flex-grow: 0;
   margin: 0 8px 12px 8px;
+}
+
+/* The rules' lines scroll when the display is too short for them, so Back under them stays in view. */
+.cl-rules-scroll {
+  flex-grow: 1;
 }
 
 .cl-rules-line {

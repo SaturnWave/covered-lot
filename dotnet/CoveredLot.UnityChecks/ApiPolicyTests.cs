@@ -62,18 +62,48 @@ namespace CoveredLot.UnityChecks
             AssertNone("Unity's build of " + name + " uses what the member bans refuse", ReviewedExemptions.Without(scanner.ApiPolicyViolations(MemberBansPolicy.Default)));
         }
 
-        /// <summary>The exemption is no blank cheque: it covers both culture reads that DevCultureSwitch really makes, and the Editor needs it nowhere.</summary>
+        /// <summary>
+        /// The exemption is no blank cheque: in Unity's build of the Client it covers exactly the three reads
+        /// DevCultureSwitch makes (CurrentName reads the current culture, ReadCultures the current and the UI culture),
+        /// and the Editor needs it nowhere.
+        /// </summary>
         [Fact]
-        public void The_reviewed_exemption_covers_both_culture_reads_of_Unity_built_DevCultureSwitch_and_nothing_in_the_Editor()
+        public void The_reviewed_exemption_covers_exactly_the_three_culture_reads_of_Unity_built_DevCultureSwitch_and_nothing_in_the_Editor()
         {
             using AssemblyScanner client = UnityOutputs.Scan("CoveredLot.Client");
             using AssemblyScanner editor = UnityOutputs.Scan("CoveredLot.Editor");
 
-            IReadOnlyList<Violation> covered = ReviewedExemptions.Covered(client.ApiPolicyViolations(MemberBansPolicy.Default));
+            IReadOnlyList<string> covered = ReviewedExemptions.Covered(client.ApiPolicyViolations(MemberBansPolicy.Default))
+                .Select(violation => MethodOf(violation.Location) + " reads " + MemberOf(violation.Reason))
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(read => read, StringComparer.Ordinal)
+                .ToList();
 
-            Assert.Contains(covered, violation => violation.Reason.StartsWith("System.Globalization.CultureInfo::get_CurrentCulture(): ", StringComparison.Ordinal));
-            Assert.Contains(covered, violation => violation.Reason.StartsWith("System.Globalization.CultureInfo::get_CurrentUICulture(): ", StringComparison.Ordinal));
+            Assert.Equal(
+                new[]
+                {
+                    "CurrentName reads get_CurrentCulture",
+                    "ReadCultures reads get_CurrentCulture",
+                    "ReadCultures reads get_CurrentUICulture",
+                },
+                covered);
             Assert.Empty(ReviewedExemptions.Covered(editor.ApiPolicyViolations(MemberBansPolicy.Default)));
+        }
+
+        /// <summary>The method of a location such as "CoveredLot.Client.DevCultureSwitch::ReadCultures+IL_0005": "ReadCultures".</summary>
+        private static string MethodOf(string location)
+        {
+            int start = location.IndexOf("::", StringComparison.Ordinal) + 2;
+            int end = location.IndexOf("+IL_", start, StringComparison.Ordinal);
+            return end < 0 ? location.Substring(start) : location.Substring(start, end - start);
+        }
+
+        /// <summary>The member of a ban's reason such as "System.Globalization.CultureInfo::get_CurrentCulture(): ...": "get_CurrentCulture".</summary>
+        private static string MemberOf(string reason)
+        {
+            int start = reason.IndexOf("::", StringComparison.Ordinal) + 2;
+            int end = reason.IndexOf('(', start);
+            return end < 0 ? reason.Substring(start) : reason.Substring(start, end - start);
         }
 
         private static void AssertNone(string heading, IReadOnlyList<Violation> violations) =>

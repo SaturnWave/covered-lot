@@ -26,8 +26,8 @@ namespace CoveredLot.Client
         /// <param name="screenChanged">What an entry's button does after the navigator has opened its level: repaint the screens.</param>
         /// <param name="showRules">What the Rules button does: show the rules over the screens.</param>
         /// <param name="nextCulture">What the culture button does: set the next culture, then show it with <see cref="ShowCulture"/>.</param>
-        /// <param name="developmentBuild">Whether the build is a development build, the only kind that shows the culture button.</param>
-        public LevelListView(Navigator navigator, Action screenChanged, Action showRules, Action nextCulture, bool developmentBuild)
+        /// <param name="build">The kind of build: only a development build shows the culture button.</param>
+        public LevelListView(Navigator navigator, Action screenChanged, Action showRules, Action nextCulture, BuildKind build)
         {
             _navigator = navigator;
             _screenChanged = screenChanged;
@@ -37,7 +37,7 @@ namespace CoveredLot.Client
             Add(title);
             Add(Classed.Button(Copy.RulesButton, showRules));
             _culture = Classed.Button(Copy.CultureButton(DevCulture.Device), nextCulture);
-            _culture.style.display = developmentBuild ? DisplayStyle.Flex : DisplayStyle.None;
+            _culture.style.display = build == BuildKind.Development ? DisplayStyle.Flex : DisplayStyle.None;
             Add(_culture);
             _entries.AddToClassList(StyleNames.LevelScroll);
             Add(_entries);

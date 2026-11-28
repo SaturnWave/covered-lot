@@ -13,8 +13,8 @@ namespace CoveredLot.Client
     /// loads the catalogue once, through ResourcesLevelTexts, makes the navigator, which starts on the level list (or on
     /// the problem screen when the catalogue did not load), and builds the screens once, with the development line and the
     /// culture button only in a development build (Debug.isDebugBuild). It keeps them in the document's root, its
-    /// safe-area padding current, the development line told of each change of the device's screen, and the screen awake
-    /// while a level is open (<see cref="DocumentScreens"/>).
+    /// safe-area padding current, the development line told of each change of the display, and the screen awake while a
+    /// level is open (<see cref="DocumentScreens"/>). When it is destroyed, the device's cultures go back.
     /// </summary>
     public sealed class GameRoot : MonoBehaviour
     {
@@ -32,7 +32,8 @@ namespace CoveredLot.Client
                 return;
             }
 
-            _screens = new DocumentScreens(document, new Navigator(LevelCatalogue.Load(new ResourcesLevelTexts())), Debug.isDebugBuild);
+            BuildKind build = Debug.isDebugBuild ? BuildKind.Development : BuildKind.Release;
+            _screens = new DocumentScreens(document, new Navigator(LevelCatalogue.Load(new ResourcesLevelTexts())), build);
         }
 
         /// <summary>
@@ -52,7 +53,7 @@ namespace CoveredLot.Client
             if (_screens is not null)
             {
                 _screens.KeepInDocument();
-                _screens.KeepUpWithTheScreen();
+                _screens.KeepUpWithTheDisplay();
                 _screens.KeepAwakeWhileALevelIsOpen();
             }
         }
@@ -63,6 +64,18 @@ namespace CoveredLot.Client
             if (_screens is not null)
             {
                 _screens.LetSleep();
+            }
+        }
+
+        /// <summary>
+        /// The game ends with this object: the device's cultures go back, so a culture picked with the culture button does
+        /// not outlive the game, as it would in the editor after Play mode.
+        /// </summary>
+        private void OnDestroy()
+        {
+            if (_screens is not null)
+            {
+                _screens.RestoreCultures();
             }
         }
 
@@ -90,18 +103,21 @@ namespace CoveredLot.Client
             /// <summary>The padding the host has; None until the first padding is worked out.</summary>
             private Option<SafeInsets> _padding;
 
-            /// <summary>The screen as it was last seen; None until it is first seen.</summary>
-            private Option<ScreenFacts> _screen;
+            /// <summary>The display as it was last seen; None until it is first seen.</summary>
+            private Option<DisplayFacts> _display;
 
             /// <summary>The sleep timeout set last; None when it has not been set since this was made or since LetSleep.</summary>
             private Option<int> _sleepTimeout;
 
-            public DocumentScreens(UIDocument document, Navigator navigator, bool developmentBuild)
+            public DocumentScreens(UIDocument document, Navigator navigator, BuildKind build)
             {
                 _document = document;
                 _navigator = navigator;
-                _host = new ScreenHost(navigator, developmentBuild);
+                _host = new ScreenHost(navigator, build);
             }
+
+            /// <summary>Puts back the device's cultures, which a development build's culture button may have changed.</summary>
+            public void RestoreCultures() => _host.RestoreCultures();
 
             /// <summary>Puts the screens into the document's current root, unless they are there already; a disabled document has no root.</summary>
             public void KeepInDocument()
@@ -113,8 +129,8 @@ namespace CoveredLot.Client
                 }
             }
 
-            /// <summary>Keeps the safe-area padding current, and the development line told when the screen's size or safe area changes.</summary>
-            public void KeepUpWithTheScreen()
+            /// <summary>Keeps the safe-area padding current, and the development line told when the display's size or safe area changes.</summary>
+            public void KeepUpWithTheDisplay()
             {
                 IPanel? panel = _host.panel;
                 if (panel is null)
@@ -122,17 +138,17 @@ namespace CoveredLot.Client
                     return;
                 }
 
-                ScreenFacts screen = ScreenFacts.Now();
-                SafeInsets padding = SafeInsets.ToPanel(screen.Size, screen.SafeArea, PanelSizeOf(panel));
+                DisplayFacts display = DisplayFacts.Now();
+                SafeInsets padding = SafeInsets.ToPanel(display.Size, display.SafeArea, PanelSizeOf(panel));
                 if (!_padding.TryGet(out SafeInsets current) || !SamePadding(current, padding))
                 {
                     _host.Pad(padding);
                     _padding = Option.Some(padding);
                 }
 
-                if (!_screen.TryGet(out ScreenFacts seen) || !seen.Matches(screen))
+                if (!_display.TryGet(out DisplayFacts seen) || !seen.Matches(display))
                 {
-                    _screen = Option.Some(screen);
+                    _display = Option.Some(display);
                     _host.RefreshDevLine();
                 }
             }

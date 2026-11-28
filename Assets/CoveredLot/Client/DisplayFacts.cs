@@ -5,12 +5,12 @@ using UnityEngine;
 namespace CoveredLot.Client
 {
     /// <summary>
-    /// The screen as Unity reported it at one moment, in whole pixels: its size, and its safe area from its bottom-left
-    /// corner. The safe-area padding (GameRoot) and the development line (ScreenHost) read it.
+    /// The display as Unity's Screen reported it at one moment, in whole pixels: its size, and its safe area from its
+    /// bottom-left corner. The safe-area padding (GameRoot) and the development line (ScreenHost) read it.
     /// </summary>
-    internal readonly struct ScreenFacts
+    internal readonly struct DisplayFacts
     {
-        private ScreenFacts(PixelSize size, PixelRect safeArea)
+        private DisplayFacts(PixelSize size, PixelRect safeArea)
         {
             Size = size;
             SafeArea = safeArea;
@@ -26,7 +26,7 @@ namespace CoveredLot.Client
         public PixelRect SafeArea { get; }
 
         /// <summary>The screen as Unity reports it now.</summary>
-        public static ScreenFacts Now()
+        public static DisplayFacts Now()
         {
             var size = new PixelSize(new HorizontalPixels(Math.Max(0, Screen.width)), new VerticalPixels(Math.Max(0, Screen.height)));
             Rect safe = Screen.safeArea;
@@ -35,11 +35,11 @@ namespace CoveredLot.Client
             int width = Math.Max(0, Whole.Floor(safe.xMax) - left);
             int height = Math.Max(0, Whole.Floor(safe.yMax) - bottom);
             var safeArea = new PixelRect(new HorizontalPixels(left), new VerticalPixels(bottom), new PixelSize(new HorizontalPixels(width), new VerticalPixels(height)));
-            return new ScreenFacts(size, safeArea);
+            return new DisplayFacts(size, safeArea);
         }
 
         /// <summary>Whether the other moment saw the same size and the same safe area, pixel for pixel.</summary>
-        public bool Matches(ScreenFacts other) =>
+        public bool Matches(DisplayFacts other) =>
             Size.Width.Value == other.Size.Width.Value && Size.Height.Value == other.Size.Height.Value
             && SafeArea.X.Value == other.SafeArea.X.Value && SafeArea.Y.Value == other.SafeArea.Y.Value
             && SafeArea.Size.Width.Value == other.SafeArea.Size.Width.Value && SafeArea.Size.Height.Value == other.SafeArea.Size.Height.Value;

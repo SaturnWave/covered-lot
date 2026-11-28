@@ -135,6 +135,9 @@ namespace CoveredLot.Core.Pictures
         /// <summary>The rules: their heading, their lines and the Back button, shown in place of a screen until Back closes them.</summary>
         public const string Rules = "cl-rules";
 
+        /// <summary>The rules' scrolling part, which holds their lines, so Back stays in view on a short display.</summary>
+        public const string RulesScroll = "cl-rules-scroll";
+
         /// <summary>A line of the rules.</summary>
         public const string RulesLine = "cl-rules-line";
 

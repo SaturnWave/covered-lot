@@ -120,28 +120,6 @@ namespace CoveredLot.Client
         private static void ShowIf(VisualElement element, bool shown) =>
             element.style.display = shown ? DisplayStyle.Flex : DisplayStyle.None;
 
-        /// <summary>
-        /// Makes the list, and the container after the children it already holds, have exactly this many elements: new
-        /// ones are made at the end, and the last ones are dropped.
-        /// </summary>
-        private static void Resize<T>(List<T> elements, VisualElement container, int count, Func<T> make)
-            where T : VisualElement
-        {
-            while (elements.Count < count)
-            {
-                T made = make();
-                elements.Add(made);
-                container.Add(made);
-            }
-
-            while (elements.Count > count)
-            {
-                T last = elements[elements.Count - 1];
-                elements.RemoveAt(elements.Count - 1);
-                last.RemoveFromHierarchy();
-            }
-        }
-
         private void Tap(PieceId piece)
         {
             // A tile exists only once a session is shown, so a click always finds one.
@@ -189,7 +167,7 @@ namespace CoveredLot.Client
 
         private void PaintBays(ReadOnlyArray<BayPicture> bays)
         {
-            Resize(_bayBoxes, _bays, bays.Count, () => new BayBox());
+            Classed.Resize(_bayBoxes, _bays, bays.Count, () => new BayBox());
             for (int index = 0; index < bays.Count; index++)
             {
                 _bayBoxes[index].Paint(bays[index]);
@@ -200,7 +178,7 @@ namespace CoveredLot.Client
         private void PaintLedger(ReadOnlyArray<LedgerPill> pills)
         {
             ShowIf(_ledger, !pills.IsEmpty);
-            Resize(_pills, _ledger, pills.Count, () => Classed.Label(StyleNames.Pill));
+            Classed.Resize(_pills, _ledger, pills.Count, () => Classed.Label(StyleNames.Pill));
             for (int index = 0; index < pills.Count; index++)
             {
                 _pills[index].text = pills[index].Text;
@@ -213,7 +191,7 @@ namespace CoveredLot.Client
         {
             ReadOnlyArray<ClueRow> rows = tags.TryGet(out CluePicture? picture) ? picture.Rows : ReadOnlyArray.Empty<ClueRow>();
             ShowIf(_tags, !rows.IsEmpty);
-            Resize(_tagRows, _tags, rows.Count, () => new TagRow());
+            Classed.Resize(_tagRows, _tags, rows.Count, () => new TagRow());
             for (int index = 0; index < rows.Count; index++)
             {
                 _tagRows[index].Paint(rows[index]);
