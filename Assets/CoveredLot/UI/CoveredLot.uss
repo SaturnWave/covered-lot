@@ -16,6 +16,7 @@
   --cl-dev-ink: #6B6B6B;
   --cl-light-ink: #FFFFFF;
   --cl-outline: #C8C2B4;
+  --cl-scroll-thumb: #8F887A;
   --cl-button: #E2DCCF;
   --cl-button-pressed: #CFC8B8;
   --cl-lot: #3A3D42;
@@ -413,17 +414,21 @@
   background-color: var(--cl-page);
 }
 
+/* The card's heading and lines keep the lot frame's 8-unit side margins, so a line of up to 344 units stays on one line
+   (the full bays' rule measured about 333 on piece 13's phone), and a longer one wraps inside the card. */
 .cl-card-heading {
-  margin: 0 16px 8px 16px;
+  margin: 0 8px 8px 8px;
   font-size: 16px;
   -unity-font-style: bold;
+  white-space: normal;
   -unity-text-align: middle-center;
   color: var(--cl-ink);
 }
 
 .cl-card-line {
-  margin: 0 16px 4px 16px;
+  margin: 0 8px 4px 8px;
   font-size: 16px;
+  white-space: normal;
   -unity-text-align: middle-center;
   color: var(--cl-ink);
 }
@@ -485,6 +490,54 @@
   align-self: center;
   min-width: 180px;
   margin-top: 8px;
+}
+
+/* The vertical bar of the list's and the rules' scrolls. Unity's runtime theme draws it 24 units wide beside what
+   scrolls, with arrow buttons and a grey track, which on piece 13's phone pushed the list's buttons 12 units left of the
+   title. Here it lies over the scroll's right edge as a 4-unit rounded thumb, with no arrows and no track, so what
+   scrolls keeps the scroll's whole width. Unity sets when the bar shows, and the thumb's height and place. The thumb
+   keeps its fill while it is touched, where the theme lightens it to the page colour. */
+.cl-level-scroll .unity-scroll-view__vertical-scroller,
+.cl-rules-scroll .unity-scroll-view__vertical-scroller {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 4px;
+}
+
+.cl-level-scroll .unity-scroller__low-button,
+.cl-level-scroll .unity-scroller__high-button,
+.cl-rules-scroll .unity-scroller__low-button,
+.cl-rules-scroll .unity-scroller__high-button {
+  display: none;
+}
+
+.cl-level-scroll .unity-scroller__slider,
+.cl-rules-scroll .unity-scroller__slider {
+  width: 4px;
+  min-width: 0;
+  margin: 0;
+}
+
+.cl-level-scroll .unity-base-slider__tracker,
+.cl-rules-scroll .unity-base-slider__tracker {
+  border-width: 0;
+  background-color: rgba(0, 0, 0, 0);
+}
+
+.cl-level-scroll .unity-base-slider__dragger,
+.cl-level-scroll .unity-base-slider__dragger:hover:enabled,
+.cl-level-scroll .unity-base-slider__dragger:active:enabled,
+.cl-rules-scroll .unity-base-slider__dragger,
+.cl-rules-scroll .unity-base-slider__dragger:hover:enabled,
+.cl-rules-scroll .unity-base-slider__dragger:active:enabled {
+  left: 0;
+  width: 4px;
+  margin: 0;
+  border-width: 0;
+  border-radius: 2px;
+  background-color: var(--cl-scroll-thumb);
 }
 
 /* The problem screen: its sentence centred on the page, and in development builds a small grey line per problem. */

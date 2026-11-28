@@ -18,7 +18,8 @@ namespace CoveredLot.Tests.EditMode
     /// <summary>
     /// The level list, the problem screen, the rules opened from the list, and the development line with its culture
     /// button (design sections 7, 9 and 10.3; simple UI piece 13), clicked in a 360 x 800 panel of the UI Test Framework
-    /// with the game's own theme, under the culture the run names. The screens start where GameRoot starts them: on the
+    /// (one test's is 360 x 373, as short as piece 12's phone's inner screen) with the game's own theme, under the culture
+    /// the run names. The screens start where GameRoot starts them: on the
     /// level list of the catalogue that ResourcesLevelTexts loads, or on the problem screen of a catalogue that did not
     /// load. The panel updates after every click. The counts are asserted, so no check passes on an empty list.
     /// </summary>
@@ -39,7 +40,19 @@ namespace CoveredLot.Tests.EditMode
         /// <summary>The Example's vehicle that bumps into vehicle 4 at the start.</summary>
         private const int ExampleBumper = 5;
 
+        /// <summary>The width of the scrolls' bar in CoveredLot.uss.</summary>
+        private const float ScrollBarWidth = 4f;
+
+        /// <summary>How far apart two centres or edges may lie and count as one: the panel lays each edge out on its pixel grid.</summary>
+        private const float SameSpot = 0.5f;
+
         private static readonly Vector2 PhonePanel = new Vector2(360, 800);
+
+        /// <summary>The panel of piece 12's phone's inner screen: as wide as every portrait phone's panel, and about 373 units high.</summary>
+        private static readonly Vector2 InnerScreenPanel = new Vector2(360, 373);
+
+        /// <summary>The fill of the scrolls' thumb: CoveredLot.uss's --cl-scroll-thumb, #8F887A.</summary>
+        private static readonly Color32 ScrollThumb = new Color32(0x8F, 0x88, 0x7A, 0xFF);
 
         /// <summary>Loading the theme is no culture-sensitive work, so it may run here, outside [HostileCulture].</summary>
         [OneTimeSetUp]
@@ -226,7 +239,77 @@ namespace CoveredLot.Tests.EditMode
             Assert.That(ShownElements.WithClass(host, StyleNames.Rules), Is.Empty, "the rules shown after Back");
         }
 
+        /// <summary>
+        /// Piece 13's phone showed Unity's desktop scroller beside the entries: 24 units wide, with arrows and a grey track,
+        /// it pushed their buttons 12 units left of the title. The bar now lies over the scroll's right edge as a thin thumb,
+        /// so the entries' buttons centre under the title.
+        /// </summary>
+        [Test]
+        public void The_entries_buttons_centre_under_the_title_and_scroll_under_a_thin_bar_on_the_right_edge()
+        {
+            ScreenHost host = ShowShippedCatalogue(BuildKind.Development);
+            float titleCentre = TheShownElement(host, StyleNames.Title).worldBound.center.x;
+            List<Button> entries = ShownEntryButtons(host);
+            var offCentre = new List<string>();
+            foreach (Button entry in entries)
+            {
+                float centre = entry.worldBound.center.x;
+                if (!(Mathf.Abs(centre - titleCentre) <= SameSpot))
+                {
+                    offCentre.Add(entry.text + " at " + Size(centre));
+                }
+            }
+
+            Assert.That(entries.Count, Is.EqualTo(ListedLevelCount + 1), "the entries' buttons shown");
+            Assert.That(offCentre, Is.Empty, "the centres of the entries' buttons that miss the title's, " + Size(titleCentre));
+            AssertAThinBarOnTheRightEdge(TheShownScroll(host, StyleNames.LevelScroll), "the list's");
+        }
+
+        /// <summary>
+        /// On a display as short as piece 12's phone's inner screen, the rules need more height than they have: their lines
+        /// scroll under the same thin bar as the entries, and Back stays in view under them.
+        /// </summary>
+        [Test]
+        public void On_a_display_as_short_as_the_inner_screen_the_rules_scroll_under_the_same_thin_bar_and_Back_stays_in_view()
+        {
+            panelSize = InnerScreenPanel;
+            ScreenHost host = ShowShippedCatalogue(BuildKind.Development);
+
+            ClickButton(host, Copy.RulesButton);
+
+            Assert.That(TheShownButton(host, Copy.Back).worldBound.yMax, Is.LessThanOrEqualTo(InnerScreenPanel.y), "the foot of Back against the panel's");
+            AssertAThinBarOnTheRightEdge(TheShownScroll(host, StyleNames.RulesScroll), "the rules'");
+        }
+
+        /// <summary>
+        /// The scroll's vertical bar shows, as what it holds is taller than it: a strip as wide as CoveredLot.uss makes it, on
+        /// the scroll's right edge and over what scrolls, which keeps the scroll's whole width; no arrow button and no track,
+        /// and a thumb in --cl-scroll-thumb inside the strip and shorter than it.
+        /// </summary>
+        private static void AssertAThinBarOnTheRightEdge(ScrollView scroll, string whose)
+        {
+            Scroller bar = scroll.verticalScroller;
+            Rect strip = bar.worldBound;
+            VisualElement track = bar.Q(className: BaseSlider<float>.trackerUssClassName);
+            VisualElement thumb = bar.Q(className: BaseSlider<float>.draggerUssClassName);
+            Rect drawn = thumb.worldBound;
+
+            Assert.That(ShownElements.IsShown(bar), Is.True, "whether " + whose + " bar shows");
+            Assert.That(strip.width, Is.EqualTo(ScrollBarWidth).Within(SameSpot), whose + " bar's width");
+            Assert.That(strip.xMax, Is.EqualTo(scroll.worldBound.xMax).Within(SameSpot), whose + " bar's right edge, against the scroll's");
+            Assert.That(scroll.contentViewport.worldBound.width, Is.EqualTo(scroll.worldBound.width).Within(SameSpot), "the width " + whose + " scroll leaves what scrolls, against its own");
+            Assert.That(ShownElements.IsShown(bar.lowButton) || ShownElements.IsShown(bar.highButton), Is.False, "whether " + whose + " bar shows an arrow button");
+            Assert.That(((Color32)track.resolvedStyle.backgroundColor).a, Is.EqualTo(0), "the alpha of " + whose + " bar's track");
+            Assert.That(thumb.resolvedStyle.visibility, Is.EqualTo(Visibility.Visible), "the visibility of " + whose + " thumb");
+            Assert.That(drawn.xMin >= strip.xMin - SameSpot && drawn.xMax <= strip.xMax + SameSpot, Is.True,
+                whose + " thumb's sides, " + Size(drawn.xMin) + " to " + Size(drawn.xMax) + ", within the strip's, " + Size(strip.xMin) + " to " + Size(strip.xMax));
+            Assert.That(drawn.height, Is.GreaterThan(0f).And.LessThan(strip.height), whose + " thumb's height, against the strip's " + Size(strip.height));
+            Assert.That((Color32)thumb.resolvedStyle.backgroundColor, Is.EqualTo(ScrollThumb), whose + " thumb's fill");
+        }
+
         private static string Number(int value) => value.ToString(CultureInfo.InvariantCulture);
+
+        private static string Size(float value) => value.ToString("0.##", CultureInfo.InvariantCulture);
 
         /// <summary>A culture's name, or "none" for a default-thread culture that is unset.</summary>
         private static string NameOf(CultureInfo? culture) => culture is null ? "none" : culture.Name;
@@ -235,15 +318,27 @@ namespace CoveredLot.Tests.EditMode
         private static List<string> EntryButtons(ScreenHost host)
         {
             var texts = new List<string>();
+            foreach (Button button in ShownEntryButtons(host))
+            {
+                texts.Add(button.text);
+            }
+
+            return texts;
+        }
+
+        /// <summary>The shown entries' buttons, in the list's order.</summary>
+        private static List<Button> ShownEntryButtons(ScreenHost host)
+        {
+            var entries = new List<Button>();
             foreach (Button button in ShownElements.OfType<Button>(host))
             {
                 if (button.ClassListContains(StyleNames.LevelButton))
                 {
-                    texts.Add(button.text);
+                    entries.Add(button);
                 }
             }
 
-            return texts;
+            return entries;
         }
 
         /// <summary>The texts of the shown buttons that are no entry's, in the tree's order.</summary>
@@ -274,6 +369,34 @@ namespace CoveredLot.Tests.EditMode
             }
 
             Assert.That(buttons.Count, Is.EqualTo(1), "the culture buttons shown");
+            return buttons[0];
+        }
+
+        /// <summary>The one shown element with the class under the root.</summary>
+        private static VisualElement TheShownElement(VisualElement root, string className)
+        {
+            List<VisualElement> shown = ShownElements.WithClass(root, className);
+            Assert.That(shown.Count, Is.EqualTo(1), "the elements shown with the class " + className);
+            return shown[0];
+        }
+
+        /// <summary>The one shown scroll with the class under the root.</summary>
+        private static ScrollView TheShownScroll(VisualElement root, string className) =>
+            TheShownElement(root, className) as ScrollView ?? throw new AssertionException("The element shown with the class " + className + " is no ScrollView.");
+
+        /// <summary>The one shown button with the text under the host.</summary>
+        private static Button TheShownButton(ScreenHost host, string text)
+        {
+            var buttons = new List<Button>();
+            foreach (Button button in ShownElements.OfType<Button>(host))
+            {
+                if (button.text == text)
+                {
+                    buttons.Add(button);
+                }
+            }
+
+            Assert.That(buttons.Count, Is.EqualTo(1), "the buttons shown with the text " + text);
             return buttons[0];
         }
 
@@ -320,17 +443,7 @@ namespace CoveredLot.Tests.EditMode
 
         private void ClickButton(ScreenHost host, string text)
         {
-            var buttons = new List<Button>();
-            foreach (Button button in ShownElements.OfType<Button>(host))
-            {
-                if (button.text == text)
-                {
-                    buttons.Add(button);
-                }
-            }
-
-            Assert.That(buttons.Count, Is.EqualTo(1), "the buttons shown with the text " + text);
-            simulate.Click(buttons[0]);
+            simulate.Click(TheShownButton(host, text));
             Settle();
         }
 

@@ -60,6 +60,9 @@ namespace CoveredLot.Tests.EditMode
         /// <summary>A bay with neither a letter nor a swatch, as BaysOf describes it.</summary>
         private const string EmptyBay = "empty";
 
+        /// <summary>A sentence about three times as wide as the end card, which no fail writes.</summary>
+        private const string WiderThanTheCard = "Three of one colour leave the bays together. Three of one colour leave the bays together. Three of one colour leave the bays together.";
+
         /// <summary>Level 1's vehicle 3, the yellow one at the left end of row 2, which faces west and drives straight out.</summary>
         private const int LevelOneLeaver = 3;
 
@@ -231,6 +234,34 @@ namespace CoveredLot.Tests.EditMode
             }
 
             Assert.That(tops, Is.EqualTo(new[] { lotTop, lotTop }), "the top of the lot's frame with each of the longest status lines, against with none");
+        }
+
+        /// <summary>
+        /// Piece 13's phone showed the full bays' rule a few units wider than its line, and on one line. The fail card's
+        /// heading and line now wrap inside the card: set on the labels themselves to a sentence about three times the card's
+        /// width, each takes at least twice the height it takes with one word, and keeps within the card's sides.
+        /// </summary>
+        [Test]
+        public void A_heading_or_a_line_wider_than_the_fail_card_wraps_inside_the_card()
+        {
+            ScreenHost host = ShowExample();
+            ClickAll(host, FailingLine);
+            VisualElement card = TheShownCard(host);
+            Label heading = card.Q<Label>(className: StyleNames.CardHeading);
+            Label line = card.Q<Label>(className: StyleNames.CardLine);
+            heading.text = "Bays";
+            line.text = "Bays";
+            Settle();
+            float oneHeadingLine = heading.layout.height;
+            float oneLine = line.layout.height;
+
+            heading.text = WiderThanTheCard;
+            line.text = WiderThanTheCard;
+            Settle();
+
+            Assert.That(heading.layout.height, Is.GreaterThanOrEqualTo(2 * oneHeadingLine), "the height of the card's heading with the wide sentence, against " + Size(oneHeadingLine) + " with one word");
+            Assert.That(line.layout.height, Is.GreaterThanOrEqualTo(2 * oneLine), "the height of the card's line with the wide sentence, against " + Size(oneLine) + " with one word");
+            Assert.That(WithinTheSides(heading.worldBound, card.worldBound) && WithinTheSides(line.worldBound, card.worldBound), Is.True, "whether the heading and the line keep within the card's sides");
         }
 
         /// <summary>The win card offers Next level only while another entry follows: a catalogue of the Example alone has none after it.</summary>
@@ -590,6 +621,9 @@ namespace CoveredLot.Tests.EditMode
             Assert.That(cards.Count, Is.EqualTo(1), "the end cards shown");
             return cards[0];
         }
+
+        /// <summary>Whether the inner rectangle lies between the outer one's left and right sides.</summary>
+        private static bool WithinTheSides(Rect inner, Rect outer) => inner.xMin >= outer.xMin && inner.xMax <= outer.xMax;
 
         /// <summary>
         /// Each bay of the bays row, in order: one that shows a letter or a swatch as its letter, then its swatch classes,
